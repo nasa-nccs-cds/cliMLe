@@ -43,7 +43,7 @@ class Project:
         dataset = self.getDataset( experiment, rType )
         varnames = [ vname for vname in dataset.listvariables() if not vname.endswith("_bnds") ]
         varnames.sort()
-        return [ dataset(varName)[0:9] for varName in varnames ]
+        return [ dataset(varName) for varName in varnames ]
 
 
 class BatchServer:
@@ -83,8 +83,8 @@ if __name__ == "__main__":
 
     print
     print "SHUFFLE: BATCH:"
-    bserv = BatchServer( project, experiment, 3, BATCH )
-    for iBatch in range(6):
+    bserv = BatchServer( project, experiment, 80, BATCH )
+    for iBatch in range(3):
         batche = bserv.getNextBatch()
         print "Batch " + str( iBatch ) + ":"
         print str( batche )

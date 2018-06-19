@@ -29,7 +29,7 @@ model.add( Dense( units=bserv.output_size ) )
 model.compile( loss='mse', optimizer='sgd', metrics=['accuracy'] )
 
 for iEpoch in range( nEpocs ):
-    for iBatch in range( bserv.batchSize ):
+    for iBatch in range( bserv.numBatches ):
         x_train, y_train = bserv.getNextBatch()
         print "Training on Epoc {0}, Batch {1}, input shape = {2}, output shape = {3} ".format( str(iEpoch), str(iBatch), str(x_train.shape), str(y_train.shape))
         model.train_on_batch( x_train, y_train )

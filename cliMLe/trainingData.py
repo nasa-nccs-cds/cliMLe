@@ -21,12 +21,19 @@ class ProjectDataSource(DataSource):
         self.dataFile = os.path.join( os.path.join( self.rootDir, "data" ), name + ".nc" )
         self.variables = variableList
 
-    def getTimeseries(self):
+    def getTimeseries(self, normalize = True ):
         dset = cdms.open( self.dataFile )
-        variables = [  dset.getVariable( varName ) for varName in self.variables ]
-        timeseries = [ variable(self.selector).data for variable in variables ]
+        norm_timeseries = []
+        for varName in self.variables:
+            variable =  dset.getVariable( varName )
+            timeseries =  variable(self.selector).data
+            if normalize:
+                std = np.std( timeseries, 0 )
+                norm_timeseries.append( timeseries / std )
+            else:
+                norm_timeseries.append( timeseries )
         dset.close()
-        return timeseries
+        return norm_timeseries
 
     def listVariables(self):
         dset = cdms.open( self.dataFile )

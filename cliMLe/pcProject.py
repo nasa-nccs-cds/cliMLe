@@ -7,7 +7,7 @@ EOF = 1
 
 NONE = 0
 BATCH = 1
-SERIES = 2
+EPOCH = 2
 
 class Project:
 
@@ -44,54 +44,5 @@ class Project:
         varnames = [ vname for vname in dataset.listvariables() if not vname.endswith("_bnds") ]
         varnames.sort()
         return [ dataset(varName) for varName in varnames ]
-
-
-class BatchServer:
-
-    def __init__(self, _project, _experiment, _batchSize = sys.maxint, _shuffleMode = NONE ):
-       self.batchSizeRequest = _batchSize
-       self.shuffleMode = _shuffleMode
-       self.experiment = _experiment
-       self.project = _project
-       self.batchIndex = -1
-       self.variables = _project.getVariables( self.experiment, PC ) # type: list[cdms.tvariable.TransientVariable]
-       self.size = self.variables[0].shape[0]
-       self.numBatches = int( round( float( self.size ) / self.batchSizeRequest ) )
-       self.batchSize = math.ceil( float( self.size ) / self.numBatches )
-       self.series = np.column_stack( [ var[:].data for var in self.variables ] )
-       self.perm_series = self.series
-
-    def getNextBatch(self):
-        self.batchIndex = ( self.batchIndex + 1 ) % self.numBatches
-        start_index = self.batchIndex * self.batchSize
-        end_index = min( start_index + self.batchSize, self.size )
-        if (self.shuffleMode == SERIES) and (self.batchIndex == 0):
-            self.perm_series = np.random.permutation(self.series)
-        pc_batch = self.perm_series[start_index:end_index]
-        rv =  np.random.permutation(pc_batch) if (self.shuffleMode == BATCH) else pc_batch
-        return rv
-
-if __name__ == "__main__":
-    projectName = "MERRA2_EOFs"
-    varName = "ts"
-    data_path = 'https://dataserver.nccs.nasa.gov/thredds/dodsC/bypass/CREATE-IP/Reanalysis/NASA-GMAO/GEOS-5/MERRA2/mon/atmos/' + varName + '.ncml'
-    outDir = "/tmp/"
-    start_year = 1980
-    end_year = 2015
-    nModes = 32
-    experiment = projectName + '_'+str(start_year)+'-'+str(end_year) + '_M' + str(nModes) + "_" + varName
-    project = Project(outDir,projectName)
-
-    print
-    print "SHUFFLE: BATCH:"
-    bserv = BatchServer( project, experiment, 80, BATCH )
-    for iBatch in range(3):
-        batche = bserv.getNextBatch()
-        print "Batch " + str( iBatch ) + ":"
-        print str( batche )
-
-
-
-
 
 

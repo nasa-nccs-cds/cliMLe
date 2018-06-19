@@ -8,5 +8,6 @@ setup(name='cliMLe',
       author='Thomas Maxwell',
       author_email='thomas.maxwell@nasa.gov',
       url='https://github.com/nasa-nccs-cds/cliMLe.git',
-      packages=[ 'cliMLe' ],
+      packages=[ 'cliMLe', 'data' ],
+      package_data={ 'data': ['*.nc'] }
 )

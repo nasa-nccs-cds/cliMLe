@@ -73,12 +73,13 @@ class BatchServer:
 
 if __name__ == "__main__":
     projectName = "MERRA2_EOFs"
+    varName = "ts"
+    data_path = 'https://dataserver.nccs.nasa.gov/thredds/dodsC/bypass/CREATE-IP/Reanalysis/NASA-GMAO/GEOS-5/MERRA2/mon/atmos/' + varName + '.ncml'
     outDir = "/tmp/"
     start_year = 1980
-    end_year = 2000
-    varName = "ts"
-    experiment = projectName + '_'+str(start_year)+'-'+str(end_year) + '_' + varName
-
+    end_year = 2015
+    nModes = 32
+    experiment = projectName + '_'+str(start_year)+'-'+str(end_year) + '_M' + str(nModes) + "_" + varName
     project = Project(outDir,projectName)
 
     print

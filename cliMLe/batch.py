@@ -6,10 +6,11 @@ from trainingData import *
 
 class BatchServer:
 
-    def __init__(self, _project, _experiment, _trainingData, _batchSize = sys.maxint, _shuffleMode = NONE ):
+    def __init__(self, _project, _experiment, _trainingData, _batchSize = sys.maxint, _shuffleMode = NONE, _normalize = True ):
        # type: (Project, str, TrainingDataset, int, int) -> BatchServer
        self.batchSizeRequest = _batchSize
        self.shuffleMode = _shuffleMode
+       self.normalize = _normalize
        self.experiment = _experiment
        self.project = _project
        self.trainingData = _trainingData
@@ -18,7 +19,7 @@ class BatchServer:
        self.size = self.variables[0].shape[0]
        self.numBatches = int( round( float( self.size ) / self.batchSizeRequest ) )
        self.batchSize = math.ceil( float( self.size ) / self.numBatches )
-       data_series = [ var[:].data for var in self.variables ]
+       data_series = [ self.preprocess(var[:].data) for var in self.variables ]
        training_series = self.trainingData.getTimeseries()
        self.input_size = len(data_series)
        self.output_size = len(training_series)
@@ -26,6 +27,13 @@ class BatchServer:
        self.series = np.column_stack( data_series )
        self.perm_series = self.series
        self.currentBatch = None
+
+    def preprocess(self, data ):
+        if self.normalize:
+            std = np.std( data, 0 )
+            return data / std
+        else:
+            return data
 
     def getNextBatch(self):
         self.batchIndex = ( self.batchIndex + 1 ) % self.numBatches
@@ -35,8 +43,7 @@ class BatchServer:
             self.perm_series = np.random.permutation(self.series)
         pc_batch = self.perm_series[start_index:end_index]
         perm_batch =  np.random.permutation(pc_batch) if (self.shuffleMode == BATCH) else pc_batch
-        perm_batch_trans = perm_batch.transpose()
-        self.currentBatch = perm_batch_trans[0:self.input_size].transpose(), perm_batch_trans[self.input_size:].transpose()
+        self.currentBatch = perm_batch[:,0:self.input_size], perm_batch[:,self.input_size:]
         return self.currentBatch
 
     def getCurrentBatch(self):
@@ -63,7 +70,7 @@ if __name__ == "__main__":
 
     print
     print "SHUFFLE: BATCH"
-    bserv = BatchServer( project, experiment, dset, 3, BATCH )
+    bserv = BatchServer( project, experiment, dset, 3, NONE )
     print "EPOC Size: " + str(  bserv.series.shape )
     print "NBatches: " + str(  bserv.numBatches )
 
@@ -74,24 +81,24 @@ if __name__ == "__main__":
     print "Output:"
     print str(output)
 
-    # print "\nEPOC 1"
-    # for iBatch in range( bserv.numBatches ):
-    #     input, output = bserv.getNextBatch()
-    #     print "Batch " + str( iBatch ) + ", input shape = " + str( input.shape ) + ", output shape = " + str( output.shape )
-    #     print "Input:"
-    #     print str( input )
-    #     print "Output:"
-    #     print str( output )
-    #
-    #
-    # print "\nEPOC 2"
-    # for iBatch in range( bserv.numBatches ):
-    #     input, output = bserv.getNextBatch()
-    #     print "Batch " + str( iBatch ) + ", input shape = " + str( input.shape ) + ", output shape = " + str( output.shape )
-    #     print "Input:"
-    #     print str( input )
-    #     print "Output:"
-    #     print str( output )
+    print "\nEPOC 1"
+    for iBatch in range( bserv.numBatches ):
+        input, output = bserv.getNextBatch()
+        print "Batch " + str( iBatch ) + ", input shape = " + str( input.shape ) + ", output shape = " + str( output.shape )
+        print "Input:"
+        print str( input )
+        print "Output:"
+        print str( output )
+
+
+    print "\nEPOC 2"
+    for iBatch in range( bserv.numBatches ):
+        input, output = bserv.getNextBatch()
+        print "Batch " + str( iBatch ) + ", input shape = " + str( input.shape ) + ", output shape = " + str( output.shape )
+        print "Input:"
+        print str( input )
+        print "Output:"
+        print str( output )
 
 
 

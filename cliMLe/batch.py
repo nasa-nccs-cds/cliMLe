@@ -42,6 +42,11 @@ class BatchServer:
     def getCurrentBatch(self):
         return self.currentBatch
 
+    def getEpoch(self):
+        if self.shuffleMode == EPOCH:
+            self.perm_series = np.random.permutation(self.series)
+        return self.perm_series[:,0:self.input_size], self.perm_series[:,self.input_size:]
+
 if __name__ == "__main__":
     projectName = "MERRA2_EOFs"
     varName = "ts"
@@ -62,24 +67,31 @@ if __name__ == "__main__":
     print "EPOC Size: " + str(  bserv.series.shape )
     print "NBatches: " + str(  bserv.numBatches )
 
-    print "\nEPOC 1"
-    for iBatch in range( bserv.numBatches ):
-        input, output = bserv.getNextBatch()
-        print "Batch " + str( iBatch ) + ", input shape = " + str( input.shape ) + ", output shape = " + str( output.shape )
-        print "Input:"
-        print str( input )
-        print "Output:"
-        print str( output )
+    input, output = bserv.getEpoch()
+    print "Epoch, input shape = " + str(input.shape) + ", output shape = " + str(output.shape)
+    print "Input:"
+    print str(input)
+    print "Output:"
+    print str(output)
 
-
-    print "\nEPOC 2"
-    for iBatch in range( bserv.numBatches ):
-        input, output = bserv.getNextBatch()
-        print "Batch " + str( iBatch ) + ", input shape = " + str( input.shape ) + ", output shape = " + str( output.shape )
-        print "Input:"
-        print str( input )
-        print "Output:"
-        print str( output )
+    # print "\nEPOC 1"
+    # for iBatch in range( bserv.numBatches ):
+    #     input, output = bserv.getNextBatch()
+    #     print "Batch " + str( iBatch ) + ", input shape = " + str( input.shape ) + ", output shape = " + str( output.shape )
+    #     print "Input:"
+    #     print str( input )
+    #     print "Output:"
+    #     print str( output )
+    #
+    #
+    # print "\nEPOC 2"
+    # for iBatch in range( bserv.numBatches ):
+    #     input, output = bserv.getNextBatch()
+    #     print "Batch " + str( iBatch ) + ", input shape = " + str( input.shape ) + ", output shape = " + str( output.shape )
+    #     print "Input:"
+    #     print str( input )
+    #     print "Output:"
+    #     print str( output )
 
 
 

@@ -6,12 +6,12 @@ from cliMLe.trainingData import *
 
 projectName = "MERRA2_EOFs"
 varName = "ts"
-outDir = "/tmp/"
+outDir = os.path.expanduser("~/results/")
 start_year = 1980
 end_year = 2015
-nModes = 32
-batchSize = 80
-nEpocs = 10
+nModes = 20
+batchSize = 50
+nEpocs = 100
 experiment = projectName + '_'+str(start_year)+'-'+str(end_year) + '_M' + str(nModes) + "_" + varName
 time_range_lag0 = ( "1980-1-1", "2014-12-1" )
 time_range_lag1 = ( "1980-2-1", "2015-1-1" )

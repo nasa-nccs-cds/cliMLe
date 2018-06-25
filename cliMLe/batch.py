@@ -58,19 +58,19 @@ if __name__ == "__main__":
     projectName = "MERRA2_EOFs"
     varName = "ts"
     data_path = 'https://dataserver.nccs.nasa.gov/thredds/dodsC/bypass/CREATE-IP/Reanalysis/NASA-GMAO/GEOS-5/MERRA2/mon/atmos/' + varName + '.ncml'
-    outDir = "/tmp/"
+    outDir = os.path.expanduser("~/results/")
     start_year = 1980
-    end_year = 1982
-    nModes = 3
+    end_year = 2015
+    nModes = 20
     experiment = projectName + '_' + str(start_year) + '-' + str(end_year) + '_M' + str(nModes) + "_" + varName
     project = Project(outDir,projectName)
 
-    td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "indian_ocean_dipole", "pdo_timeseries_mon", "amo_timeseries_mon" ], ( "1980-1-1", "1981-12-31" ) )
+    td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "indian_ocean_dipole", "pdo_timeseries_mon", "amo_timeseries_mon" ], ( "1980-1-1", "2014-12-31" ) )
     dset = TrainingDataset( [td] )
 
     print
     print "SHUFFLE: BATCH"
-    bserv = BatchServer( project, experiment, dset, 3, NONE )
+    bserv = BatchServer( project, experiment, dset, 84, NONE )
     print "EPOC Size: " + str(  bserv.series.shape )
     print "NBatches: " + str(  bserv.numBatches )
 

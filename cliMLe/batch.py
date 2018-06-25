@@ -4,6 +4,36 @@ import numpy as np
 from pcProject import *
 from trainingData import *
 
+class EpocServer:
+
+    def __init__(self, _project, _experiment, _trainingData, _validataion_fraction, _normalize = True ):
+       # type: (Project, str, TrainingDataset, int, int) -> BatchServer
+       self.validataion_fraction = _validataion_fraction
+       self.normalize = _normalize
+       self.experiment = _experiment
+       self.project = _project
+       self.trainingData = _trainingData
+       self.variables = _project.getVariables( self.experiment, PC ) # type: list[cdms.tvariable.TransientVariable]
+       self.size = self.variables[0].shape[0]
+       self.validationSize = math.ceil( self.size *  self.validataion_fraction )
+       self.epocSize = self.size - self.validationSize
+       self.inputData = np.column_stack( [ self.preprocess(var[:].data) for var in self.variables ] )
+       self.outputData = np.column_stack( self.trainingData.getTimeseries() )
+       self.output_size = self.outputData.shape[1]
+
+    def preprocess(self, data ):
+        if self.normalize:
+            std = np.std( data, 0 )
+            return data / std
+        else:
+            return data
+
+    def getEpoch(self):
+        return self.inputData[0:self.epocSize], self.outputData[0:self.epocSize]
+
+    def getValidation(self):
+        return self.inputData[self.epocSize:], self.outputData[self.epocSize:]
+
 class BatchServer:
 
     def __init__(self, _project, _experiment, _trainingData, _batchSize = sys.maxint, _shuffleMode = NONE, _normalize = True ):

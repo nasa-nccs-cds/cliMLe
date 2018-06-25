@@ -5,7 +5,7 @@ from cliMLe.batch import BatchServer
 from cliMLe.trainingData import *
 
 projectName = "MERRA2_EOFs"
-varName = "ts"
+varName = "zg"
 outDir = os.path.expanduser("~/results/")
 start_year = 1980
 end_year = 2015

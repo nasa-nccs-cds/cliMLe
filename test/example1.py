@@ -1,17 +1,22 @@
+import os
+from time import time
 from keras.models import Sequential
 from keras.layers import Dense, Activation
 from cliMLe.pcProject import Project, BATCH
 from cliMLe.batch import BatchServer
 from cliMLe.trainingData import *
+from keras.callbacks import TensorBoard
+import tensorflow as tf
+
 
 projectName = "MERRA2_EOFs"
 varName = "ts"
-outDir = "/tmp/"
+outDir = os.path.expanduser("~/results/")
 start_year = 1980
 end_year = 2015
-nModes = 32
+nModes = 20
 batchSize = 80
-nEpocs = 10
+nEpocs = 50
 experiment = projectName + '_'+str(start_year)+'-'+str(end_year) + '_M' + str(nModes) + "_" + varName
 time_range_lag0 = ( "1980-1-1", "2014-12-1" )
 time_range_lag1 = ( "1980-2-1", "2015-1-1" )
@@ -27,12 +32,14 @@ model = Sequential()
 model.add( Dense(units=16, activation='relu', input_dim=nModes ) )
 model.add( Dense( units=bserv.output_size ) )
 model.compile( loss='mse', optimizer='sgd', metrics=['accuracy'] )
+tensorboard = TensorBoard(log_dir="~/keras_test/{}".format(time()))
+
 
 for iEpoch in range( nEpocs ):
     for iBatch in range( bserv.numBatches ):
         x_train, y_train = bserv.getNextBatch()
         print "Training on Epoc {0}, Batch {1}, input shape = {2}, output shape = {3} ".format( str(iEpoch), str(iBatch), str(x_train.shape), str(y_train.shape))
-        model.train_on_batch( x_train, y_train )
+        model.train_on_batch( x_train, y_train)
 
     x_test, y_test = bserv.getCurrentBatch()
     loss_and_metrics = model.evaluate( x_test, y_test, batch_size=batchSize )

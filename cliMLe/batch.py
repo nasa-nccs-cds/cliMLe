@@ -29,6 +29,9 @@ class EpocServer:
             return data
 
     def getEpoch(self):
+        return self.inputData, self.outputData
+
+    def getTrain(self):
         return self.inputData[0:self.epocSize], self.outputData[0:self.epocSize]
 
     def getValidation(self):

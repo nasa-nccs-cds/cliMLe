@@ -37,7 +37,7 @@ model.add( Dense(units=nHiddenUnits, activation='relu', input_dim=nModes ) )
 model.add( Dense( units=eserv.output_size ) )
 model.compile( loss='mse', optimizer='sgd', metrics=['accuracy'] )
 
-x_train, y_train = eserv.getEpoch()
+x_train, y_train = eserv.getTrain()
 X_test, Y_test = eserv.getValidation()
 
 tensorboard = TensorBoard( log_dir=logDir, histogram_freq=0, write_graph=True )

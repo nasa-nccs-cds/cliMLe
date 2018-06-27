@@ -7,15 +7,16 @@ from time import time
 from datetime import datetime, date, time
 from keras.callbacks import TensorBoard
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 projectName = "MERRA2_EOFs"
-varName = "ts"
+varName = "zg"
 outDir = os.path.expanduser("~/results")
 start_year = 1980
 end_year = 2015
 nModes = 32
 batchSize = 100
-nEpocs = 500
+nEpocs = 1000
 nHiddenUnits = 16
 timestamp = datetime.now().strftime("%m-%d-%y.%H:%M:%S")
 experiment = projectName + '_'+str(start_year)+'-'+str(end_year) + '_M' + str(nModes) + "_" + varName
@@ -39,7 +40,15 @@ model.compile( loss='mse', optimizer='sgd', metrics=['accuracy'] )
 
 x_train, y_train = eserv.getTrain()
 X_test, Y_test = eserv.getValidation()
+x, y = eserv.getEpoch()
 
 tensorboard = TensorBoard( log_dir=logDir, histogram_freq=0, write_graph=True )
 
 model.fit( x_train, y_train, batch_size=batchSize, epochs=nEpocs, validation_data=(X_test, Y_test), shuffle=True, callbacks=[tensorboard] )
+
+prediction = model.predict(x)
+plt.title("Training data with Prediction (nino34) 1980-2015 (1000 Epochs)")
+plt.plot(prediction, label = "prediction", color = "r")
+plt.plot(y, label = "training data", color = "b")
+plt.legend()
+plt.show()

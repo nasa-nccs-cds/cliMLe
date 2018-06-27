@@ -29,19 +29,16 @@ print "Saving results to log dir: " + logDir
 
 td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "amo_timeseries_mon" ], time_range ) # , "pdo_timeseries_mon", "indian_ocean_dipole", "nino34"
 dset = TrainingDataset( [td] )
-eserv = EpocServer( pcDataset, dset, 0.1 )
+eserv = EpocServer( pcDataset, dset )
 
 model = Sequential()
 model.add( Dense(units=nHiddenUnits, activation='relu', input_dim=pcDataset.getInputDimension() ) )
 model.add( Dense( units=eserv.output_size ) )
 model.compile( loss='mse', optimizer='sgd', metrics=['accuracy'] )
 
-x_train, y_train = eserv.getTrain()
-X_test, Y_test = eserv.getValidation()
 x, y = eserv.getEpoch()
-
 tensorboard = TensorBoard( log_dir=logDir, histogram_freq=0, write_graph=True )
-model.fit( x_train, y_train, batch_size=batchSize, epochs=nEpocs, validation_data=(X_test, Y_test), shuffle=True, callbacks=[tensorboard] )
+model.fit( x, y, batch_size=batchSize, epochs=nEpocs, validation_split=0.1, shuffle=True, callbacks=[tensorboard] )
 
 prediction = model.predict(x)
 plt.title("Training data with Prediction ({0}->nino34, lag {1}) {2}-{3} ({4} Epochs)".format(pcDataset.getVariableIds(),lag,start_year,end_year,nEpocs))

@@ -12,6 +12,7 @@ class DataSource:
         self.selector = Selector(time=self.time_bounds )
 
     def getTimeseries(self): raise NotImplementedError
+        # type: (bool) -> list[np.ndarray]
 
 
 class ProjectDataSource(DataSource):
@@ -23,7 +24,7 @@ class ProjectDataSource(DataSource):
         self.variables = variableList
 
     def getTimeseries(self, normalize = True ):
-        # type: (bool) -> list[(str,np.ndarray)]
+        # type: (bool) -> list[np.ndarray]
         dset = cdms.open( self.dataFile )
         norm_timeseries = []
         for varName in self.variables:
@@ -31,9 +32,9 @@ class ProjectDataSource(DataSource):
             timeseries =  variable(self.selector).data
             if normalize:
                 std = np.std( timeseries, 0 )
-                norm_timeseries.append( (varName, timeseries / std) )
+                norm_timeseries.append( timeseries / std )
             else:
-                norm_timeseries.append( (varName, timeseries) )
+                norm_timeseries.append( timeseries )
         dset.close()
         return norm_timeseries
 
@@ -45,7 +46,7 @@ class ProjectDataSource(DataSource):
 class TrainingDataset:
 
     def __init__(self, sources = [] ):
-        # type: (list[DataSource]) -> object
+        # type: (list[DataSource]) -> None
         self.dataSources = sources
 
     def addDataSource(self, dsource ):
@@ -56,11 +57,16 @@ class TrainingDataset:
         for dsource in self.dataSources: timeseries.extend( dsource.getTimeseries() )
         return timeseries
 
+    def getTimeseriesData(self):
+        # type: () -> np.ndarray
+        timeseries = []
+        for dsource in self.dataSources: timeseries.extend( dsource.getTimeseries() )
+        return np.column_stack( timeseries )
+
     def plotTimeseries(self):
         plt.title("Training data")
-        for dsource in self.dataSources: 
-            for (tsname,tsdata) in dsource.getTimeseries():
-                plt.plot( tsdata, label = tsname )
+        for (tsname,tsdata) in self.getTimeseries().items():
+            plt.plot( tsdata, label = tsname )
         plt.legend()
         plt.show()
         

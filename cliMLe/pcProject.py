@@ -55,11 +55,18 @@ class Experiment:
         return dataset(varName)
 
     def getVariables( self, rType ):
-        # type: (int) -> list[cdms.tvariable.TransientVariable]
+        # type: (int) -> dict[str,cdms.tvariable.TransientVariable]
         dataset = self.getDataset( rType )
         varnames = [ vname for vname in dataset.listvariables() if not vname.endswith("_bnds") ]
         varnames.sort()
-        return [ dataset(varName) for varName in varnames ]
+        return { varName: dataset(varName) for varName in varnames }
+
+    def getVariableData( self, rType ):
+        # type: (int) -> dict[str,np.ndarray]
+        dataset = self.getDataset( rType )
+        varnames = [ vname for vname in dataset.listvariables() if not vname.endswith("_bnds") ]
+        varnames.sort()
+        return { varName: dataset(varName).data for varName in varnames }
 
 
 class PCDataset:
@@ -68,11 +75,18 @@ class PCDataset:
         self.experiments = _experiments if isinstance( _experiments, (list, tuple) ) else [ _experiments ] # type: List[Experiment]
 
     def getVariables(self):
-        # type: () -> list[cdms.tvariable.TransientVariable]
+        # type: () -> dict[str,cdms.tvariable.TransientVariable]
+        variable_map = {}
+        for experiment in self.experiments:
+            variable_map.update( experiment.getVariables( PC ) )
+        return variable_map
+
+    def getVariableData(self):
+        # type: () -> np.ndarray
         variable_list = []
         for experiment in self.experiments:
-            variable_list.extend( experiment.getVariables( PC ) )
-        return variable_list
+            variable_list.extend( experiment.getVariableData( PC ).values() )
+        return np.column_stack( variable_list )
 
     def getInputDimension(self):
         # type: () -> int

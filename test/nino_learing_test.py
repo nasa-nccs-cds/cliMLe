@@ -1,6 +1,6 @@
 from keras.models import Sequential
 from keras.layers import Dense, Activation
-from cliMLe.pcProject import Project, BATCH
+from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
 from cliMLe.batch import EpocServer
 from cliMLe.trainingData import *
 from time import time
@@ -8,33 +8,31 @@ from datetime import datetime, date, time
 from keras.callbacks import TensorBoard
 import tensorflow as tf
 import matplotlib.pyplot as plt
+outDir = os.path.expanduser("~/results")
 
 projectName = "MERRA2_EOFs"
-varName = "zg"
-outDir = os.path.expanduser("~/results")
 start_year = 1980
 end_year = 2015
 nModes = 32
+variables = [ Variable("ts"), Variable("zg",80000), Variable("zg",50000) ]
+project = Project(outDir,projectName)
+pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable) for variable in variables ] )
+
 batchSize = 100
-nEpocs = 1000
+nEpocs = 100
+lag = 0
 nHiddenUnits = 16
 timestamp = datetime.now().strftime("%m-%d-%y.%H:%M:%S")
-experiment = projectName + '_'+str(start_year)+'-'+str(end_year) + '_M' + str(nModes) + "_" + varName
-time_range_lag0 = ( "1980-1-1", "2014-12-1" )
-time_range_lag1 = ( "1980-2-1", "2015-1-1" )
-time_range_lag2 = ( "1980-3-1", "2015-2-1" )
-time_range_lag6 = ( "1980-7-1", "2015-6-1" )
-logDir = os.path.expanduser("~/results/logs/{}".format(experiment + "-lag6"  ))
+time_range = ( "1980-{0}-1".format(lag+1), "2014-12-1" if lag == 0 else "2015-{0}-1".format(lag) )
+logDir = os.path.expanduser("~/results/logs/{}".format( projectName + "_" + timestamp ) )
 print "Saving results to log dir: " + logDir
 
-td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], time_range_lag6 )
+td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "amo_timeseries_mon" ], time_range ) # , "pdo_timeseries_mon", "indian_ocean_dipole", "nino34"
 dset = TrainingDataset( [td] )
-
-project = Project(outDir,projectName)
-eserv = EpocServer( project, experiment, dset, 0.1 )
+eserv = EpocServer( pcDataset, dset, 0.1 )
 
 model = Sequential()
-model.add( Dense(units=nHiddenUnits, activation='relu', input_dim=nModes ) )
+model.add( Dense(units=nHiddenUnits, activation='relu', input_dim=pcDataset.getInputDimension() ) )
 model.add( Dense( units=eserv.output_size ) )
 model.compile( loss='mse', optimizer='sgd', metrics=['accuracy'] )
 
@@ -43,12 +41,11 @@ X_test, Y_test = eserv.getValidation()
 x, y = eserv.getEpoch()
 
 tensorboard = TensorBoard( log_dir=logDir, histogram_freq=0, write_graph=True )
-
 model.fit( x_train, y_train, batch_size=batchSize, epochs=nEpocs, validation_data=(X_test, Y_test), shuffle=True, callbacks=[tensorboard] )
 
 prediction = model.predict(x)
-plt.title("Training data with Prediction (nino34) 1980-2015 (1000 Epochs)")
-plt.plot(prediction, label = "prediction", color = "r")
-plt.plot(y, label = "training data", color = "b")
+plt.title("Training data with Prediction ({0}->nino34, lag {1}) {2}-{3} ({4} Epochs)".format(pcDataset.getVariableIds(),lag,start_year,end_year,nEpocs))
+plt.plot(prediction, label = "prediction")
+plt.plot(y, label = "training data")
 plt.legend()
 plt.show()

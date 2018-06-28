@@ -54,6 +54,7 @@ class TrainingDataset:
         self.dataSources.append( dsource )
 
     def getTimeseries(self):
+        # type: (bool) -> list[(str,np.ndarray)]
         timeseries = []
         for dsource in self.dataSources: timeseries.extend( dsource.getTimeseries() )
         return timeseries
@@ -67,6 +68,7 @@ class TrainingDataset:
         plt.show()
 
     def getEpoch(self):
+        # type: () -> np.ndarray
         return self.data
 
 if __name__ == "__main__":

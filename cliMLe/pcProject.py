@@ -67,8 +67,7 @@ class PCDataset:
     def __init__(self, _experiments, _normalize = True ):
        self.normalize = _normalize
        self.experiments = _experiments if isinstance( _experiments, (list, tuple) ) else [ _experiments ] # type: List[Experiment]
-       self.variables = self.getVariables()
-       self.data = np.column_stack([self.preprocess(var[:].data) for var in self.variables])
+       self.data = np.column_stack([self.preprocess(var[:].data) for var in self.getVariables()])
 
     def getVariables(self):
         # type: () -> list[cdms.tvariable.TransientVariable]
@@ -96,4 +95,5 @@ class PCDataset:
             return data
 
     def getEpoch(self):
+        # type: () -> np.ndarray
         return self.data

@@ -20,32 +20,33 @@ pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable)
 
 batchSize = 100
 nEpocs = 100
+validation_fraction = 0.1
 lag = 0
-nHiddenUnits = 16
+nHiddenUnits = 32
 timestamp = datetime.now().strftime("%m-%d-%y.%H:%M:%S")
 time_range = ( "1980-{0}-1".format(lag+1), "2014-12-1" if lag == 0 else "2015-{0}-1".format(lag) )
 logDir = os.path.expanduser("~/results/logs/{}".format( projectName + "_" + timestamp ) )
+plotPrediction = False
+
 print "Saving results to log dir: " + logDir
 
 td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "amo_timeseries_mon" ], time_range ) # , "pdo_timeseries_mon", "indian_ocean_dipole", "nino34"
 dset = TrainingDataset( [td] )
-eserv = EpocServer( pcDataset, dset, 0.1 )
 
 model = Sequential()
 model.add( Dense(units=nHiddenUnits, activation='relu', input_dim=pcDataset.getInputDimension() ) )
-model.add( Dense( units=eserv.output_size ) )
+model.add( Dense( units=dset.output_size ) )
 model.compile( loss='mse', optimizer='sgd', metrics=['accuracy'] )
 
-x_train, y_train = eserv.getTrain()
-X_test, Y_test = eserv.getValidation()
-x, y = eserv.getEpoch()
-
+x = pcDataset.getEpoch()
+y = dset.getEpoch()
 tensorboard = TensorBoard( log_dir=logDir, histogram_freq=0, write_graph=True )
-model.fit( x_train, y_train, batch_size=batchSize, epochs=nEpocs, validation_data=(X_test, Y_test), shuffle=True, callbacks=[tensorboard] )
+model.fit( x, y, batch_size=batchSize, epochs=nEpocs, validation_split=validation_fraction, shuffle=True, callbacks=[tensorboard] )
 
-prediction = model.predict(x)
-plt.title("Training data with Prediction ({0}->nino34, lag {1}) {2}-{3} ({4} Epochs)".format(pcDataset.getVariableIds(),lag,start_year,end_year,nEpocs))
-plt.plot(prediction, label = "prediction")
-plt.plot(y, label = "training data")
-plt.legend()
-plt.show()
+if plotPrediction:
+    prediction = model.predict(x)
+    plt.title("Training data with Prediction ({0}->nino34, lag {1}) {2}-{3} ({4} Epochs)".format(pcDataset.getVariableIds(),lag,start_year,end_year,nEpocs))
+    plt.plot(prediction, label = "prediction")
+    plt.plot(y, label = "training data")
+    plt.legend()
+    plt.show()

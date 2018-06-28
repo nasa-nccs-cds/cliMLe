@@ -47,6 +47,8 @@ class TrainingDataset:
     def __init__(self, sources = [] ):
         # type: (list[DataSource]) -> object
         self.dataSources = sources
+        self.outputData = np.column_stack( [ tsdata for (tsname,tsdata) in self.getTimeseries() ] )
+        self.output_size = self.outputData.shape[1]
 
     def addDataSource(self, dsource ):
         self.dataSources.append( dsource )
@@ -63,7 +65,10 @@ class TrainingDataset:
                 plt.plot( tsdata, label = tsname )
         plt.legend()
         plt.show()
-        
+
+    def getEpoch(self):
+        return self.outputData
+
 if __name__ == "__main__":
 
     td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "indian_ocean_dipole", "pdo_timeseries_mon", "amo_timeseries_mon" ], ( "1980-1-1", "2014-12-31" ) )

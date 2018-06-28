@@ -73,15 +73,18 @@ class LearningModel:
 
     def execute( self, nIterations=1, procIndex=0 ):
         # type: () -> FitResult
-        for iterIndex in range(nIterations):
-            model = Sequential()
-            for hIndex in range(len(self.hidden)):
-                if hIndex == 0:     model.add( Dense(units=self.hidden[hIndex], activation=self.activation, input_dim=self.inputs.getInputDimension() ) )
-                else:               model.add( Dense(units=self.hidden[hIndex], activation=self.activation ) )
-            model.add( Dense( units=self.outputs.output_size ) )
-            model.compile( loss='mse', optimizer='sgd', metrics=['accuracy'] )
-            history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=True, callbacks=[self.tensorboard], verbose=0 )  # type: History
-            self.updateHistory( history, iterIndex, procIndex=0 )
+        try:
+            for iterIndex in range(nIterations):
+                model = Sequential()
+                for hIndex in range(len(self.hidden)):
+                    if hIndex == 0:     model.add( Dense(units=self.hidden[hIndex], activation=self.activation, input_dim=self.inputs.getInputDimension() ) )
+                    else:               model.add( Dense(units=self.hidden[hIndex], activation=self.activation ) )
+                model.add( Dense( units=self.outputs.output_size ) )
+                model.compile( loss='mse', optimizer='sgd', metrics=['accuracy'] )
+                history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=True, callbacks=[self.tensorboard], verbose=0 )  # type: History
+                self.updateHistory( history, iterIndex, procIndex=0 )
+        except Exception as err:
+            logging.error( "PROC[{0}]: {1}".format( procIndex, str(err) ) )
         return self.bestFitResult
 
     def updateHistory( self, history, iterIndex, procIndex ):
@@ -99,9 +102,12 @@ class LearningModel:
 
     @classmethod
     def execute_learning_model( cls, procIndex, nInterations, resultQueue, lmodel_factory):
-        learningModel = lmodel_factory()
-        result = learningModel.execute( nInterations, procIndex )
-        resultQueue.put( result )
+        try:
+            learningModel = lmodel_factory()
+            result = learningModel.execute( nInterations, procIndex )
+            resultQueue.put( result )
+        except Exception as err:
+            logging.error( "PROC[{0}]: {1}".format( procIndex, str(err) ) )
 
     @classmethod
     def parallel_execute(cls, learning_model_factory, nIterPerProc, nProc=mp.cpu_count() ):

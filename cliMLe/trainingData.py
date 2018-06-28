@@ -47,8 +47,8 @@ class TrainingDataset:
     def __init__(self, sources = [] ):
         # type: (list[DataSource]) -> object
         self.dataSources = sources
-        self.outputData = np.column_stack( [ tsdata for (tsname,tsdata) in self.getTimeseries() ] )
-        self.output_size = self.outputData.shape[1]
+        self.data = np.column_stack([tsdata for (tsname, tsdata) in self.getTimeseries()])
+        self.output_size = self.data.shape[1]
 
     def addDataSource(self, dsource ):
         self.dataSources.append( dsource )
@@ -67,7 +67,7 @@ class TrainingDataset:
         plt.show()
 
     def getEpoch(self):
-        return self.outputData
+        return self.data
 
 if __name__ == "__main__":
 

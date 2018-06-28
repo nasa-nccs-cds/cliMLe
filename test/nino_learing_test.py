@@ -1,7 +1,6 @@
 from keras.models import Sequential
 from keras.layers import Dense, Activation
 from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
-from cliMLe.batch import EpocServer
 from cliMLe.trainingData import *
 from time import time
 from datetime import datetime, date, time

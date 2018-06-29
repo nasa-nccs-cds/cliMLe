@@ -136,6 +136,7 @@ class LearningModel:
         return history
 
     def plotPrediction( self, fitResult, title ):
+        plt.title(title)
 
         model1 = self.getFittedModel(fitResult)
         prediction1 = model1.predict( self.inputData )
@@ -145,7 +146,6 @@ class LearningModel:
         prediction2 = model2.predict( self.inputData )
         plt.plot(prediction2, label="prediction: final" )
 
-        plt.title(title)
         plt.plot( self.outputData, label="training data" )
         plt.legend()
         plt.show()

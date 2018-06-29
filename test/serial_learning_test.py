@@ -20,7 +20,7 @@ td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "amo_timeseries_mon" 
 trainingDataset = TrainingDataset( [td] )
 
 nIterations = 50
-batchSize = 100
+batchSize = 150
 nEpocs = 300
 validation_fraction = 0.1
 hiddenLayers = [8]

@@ -136,7 +136,10 @@ class LearningModel:
         return history
 
     def plotPrediction( self, fitResult, title ):
+        # type: (FitResult, str) -> None
         plt.title(title)
+        print "Plotting result: " + title
+        print " ---> NEpocs = {0}, loss = {1}".format(fitResult.nEpocs, fitResult.val_loss)
 
         model1 = self.getFittedModel(fitResult)
         prediction1 = model1.predict( self.inputData )

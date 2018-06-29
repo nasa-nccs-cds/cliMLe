@@ -80,7 +80,7 @@ class LearningModel:
                 model = self.createSequentialModel()
                 initial_weights = model.get_weights()
                 history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=True, callbacks=[self.tensorboard], verbose=0 )  # type: History
-                self.updateHistory( history, initial_weights, iterIndex, procIndex=0 )
+                self.updateHistory( history, initial_weights, iterIndex, procIndex )
         except Exception as err:
             logging.error( "PROC[{0}]: {1}".format( procIndex, str(err) ) )
             logging.error(traceback.format_exc())

@@ -118,6 +118,7 @@ class LearningModel:
         for iProc in range(nProc):
             print " ** Executing process " + str(iProc)
             proc = mp.Process( target=cls.execute_learning_model, args=( iProc, nIterPerProc, resultQueue, learning_model_factory ) )
+            proc.start()
             learning_processes.append(proc)
 
         results = []

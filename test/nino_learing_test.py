@@ -45,7 +45,7 @@ for iterIndex in range(nInterations):
     val_loss = history.history['val_loss']
     current_min_loss_val, current_min_loss_index = min( (val_loss[i],i) for i in xrange(len(val_loss)) )
     if not bestFitResult or (current_min_loss_val < bestFitResult.val_loss):
-        bestFitResult = FitResult( history, current_min_loss_val, current_min_loss_index )
+        bestFitResult = FitResult.new( history, current_min_loss_val, current_min_loss_index )
     print "Iteration {0}, val_loss = {1}, val_loss index = {2}, min val_loss = {3}".format( iterIndex, current_min_loss_val, current_min_loss_index, bestFitResult.val_loss )
 
 if plotPrediction:

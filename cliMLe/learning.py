@@ -8,6 +8,8 @@ from keras.callbacks import TensorBoard, History
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import multiprocessing as mp
+import random, sys
+import numpy as np
 import logging, traceback
 outDir = os.path.join( os.path.expanduser("~"), "results" )
 LOG_FILE = os.path.join( outDir, 'logs', 'cliMLe.log' )
@@ -20,7 +22,7 @@ class FitResult:
 
     @staticmethod
     def new( history, initial_weights, val_loss,  nEpocs):
-        # type: (History, list[float], float, int) -> FitResult
+        # type: (History, list[np.ndarray], float, int) -> FitResult
         return FitResult( history.history['val_loss'], initial_weights, history.model.get_weights(),  val_loss, nEpocs )
 
     def __init__( self, _val_loss_history, _initial_weights, _final_weights,  _val_loss, _nEpocs ):
@@ -72,9 +74,11 @@ class LearningModel:
         self.outputData = self.outputs.getEpoch()
         self.tensorboard = TensorBoard( log_dir=self.logDir, histogram_freq=0, write_graph=True )
         self.bestFitResult = None # type: FitResult
+        self.weights_template = self.createSequentialModel().get_weights()
 
     def execute( self, nIterations=1, procIndex=-1 ):
         # type: () -> FitResult
+        self.reseed()
         try:
             for iterIndex in range(nIterations):
                 model = self.createSequentialModel()
@@ -85,6 +89,19 @@ class LearningModel:
             logging.error( "PROC[{0}]: {1}".format( procIndex, str(err) ) )
             logging.error(traceback.format_exc())
         return self.bestFitResult
+
+    def reseed(self):
+        seed = random.randint(0, 2 ** 32 - 2)
+        np.random.seed(seed)
+
+    def getRandomWeights(self):
+        self.reseed()
+        new_weights = []
+        for wIndex in range(len(self.weights_template)):
+            wshape = self.weights_template[wIndex].shape
+            if wIndex % 2 == 1:     new_weights.append(  2 * np.random.random_sample( wshape ) - 1 )
+            else:                   new_weights.append( np.zeros( wshape, dtype=float ) )
+        return new_weights
 
     def getInitialModel(self, fitResult):
         # type: (FitResult) -> Model
@@ -126,7 +143,7 @@ class LearningModel:
         return model
 
     def updateHistory( self, history, initial_weights, iterIndex, procIndex ):
-        # type: (History, int) -> History
+        # type: (History, list[np.ndarray], int, int) -> History
         val_loss = history.history['val_loss']
         current_min_loss_val, current_min_loss_index = min( (val_loss[i],i) for i in xrange(len(val_loss)) )
         if not self.bestFitResult or (current_min_loss_val < self.bestFitResult.val_loss ):

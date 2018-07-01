@@ -20,9 +20,9 @@ td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "amo_timeseries_mon" 
 trainingDataset = TrainingDataset( [td] )
 
 nIterations = 50
-batchSize = 150
+batchSize = 100
 nEpocs = 300
-validation_fraction = 0.1
+validation_fraction = 0.25
 hiddenLayers = [8]
 activation = "relu"
 plotPrediction = True

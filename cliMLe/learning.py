@@ -65,6 +65,7 @@ class LearningModel:
         self.nEpocs = kwargs.get( 'epocs', 300 )
         self.validation_fraction = kwargs.get(  'vf', 0.1 )
         self.hidden = kwargs.get(  'hidden', [16] )
+        self.shuffle = kwargs.get('shuffle', False )
         self.weights = kwargs.get(  'weights', None )
         self.activation = kwargs.get(  'activation', 'relu' )
         self.timestamp = datetime.now().strftime("%m-%d-%y.%H:%M:%S")
@@ -83,7 +84,7 @@ class LearningModel:
             for iterIndex in range(nIterations):
                 model = self.createSequentialModel()
                 initial_weights = model.get_weights()
-                history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=True, callbacks=[self.tensorboard], verbose=0 )  # type: History
+                history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, callbacks=[self.tensorboard], verbose=0 )  # type: History
                 self.updateHistory( history, initial_weights, iterIndex, procIndex )
         except Exception as err:
             logging.error( "PROC[{0}]: {1}".format( procIndex, str(err) ) )
@@ -113,7 +114,7 @@ class LearningModel:
         # type: (FitResult) -> Model
         model = self.createSequentialModel()
         model.set_weights( fitResult.initial_weights )
-        model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=fitResult.nEpocs, validation_split=self.validation_fraction, shuffle=True, verbose=0 )  # type: History
+        model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=fitResult.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, verbose=0 )  # type: History
         return model
 
     def getFinalModel( self, fitResult ):
@@ -126,18 +127,24 @@ class LearningModel:
         # type: (FitResult) -> Model
         model = self.createSequentialModel()
         model.set_weights( fitResult.initial_weights )
-        model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=True, verbose=0 )  # type: History
+        model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, verbose=0 )  # type: History
         return model
 
     def createSequentialModel( self ):
         # type: () -> Sequential
         model = Sequential()
-        for hIndex in range(len(self.hidden)):
+        nHidden = len(self.hidden)
+        nOutputs = self.outputs.output_size
+        nInputs = self.inputs.getInputDimension()
+
+        for hIndex in range(nHidden):
             if hIndex == 0:
-                model.add(Dense(units=self.hidden[hIndex], activation=self.activation, input_dim=self.inputs.getInputDimension()))
+                model.add(Dense(units=self.hidden[hIndex], activation=self.activation, input_dim=nInputs))
             else:
                 model.add(Dense(units=self.hidden[hIndex], activation=self.activation))
-        model.add(Dense(units=self.outputs.output_size))
+        output_layer = Dense(units=nOutputs) if nHidden else Dense(units=nOutputs, input_dim=nInputs)
+        model.add( output_layer )
+
         model.compile(loss='mse', optimizer='sgd', metrics=['accuracy'])
         if self.weights is not None: model.set_weights(self.weights)
         return model
@@ -148,7 +155,7 @@ class LearningModel:
         current_min_loss_val, current_min_loss_index = min( (val_loss[i],i) for i in xrange(len(val_loss)) )
         if not self.bestFitResult or (current_min_loss_val < self.bestFitResult.val_loss ):
             self.bestFitResult = FitResult.new( history, initial_weights, current_min_loss_val, current_min_loss_index )
-        if procIndex < 0:   print "Executed iteration {0}, current loss = {1}, best loss = {2}".format(iterIndex, history.history[ 'val_loss'], self.bestFitResult.val_loss)
+        if procIndex < 0:   print "Executed iteration {0}, current loss = {1}  (NE={2}), best loss = {3} (NE={4})".format(iterIndex, current_min_loss_val, current_min_loss_index, self.bestFitResult.val_loss, self.bestFitResult.nEpocs )
         else:               logging.info( "PROC[{0}]: Iteration {1}, val_loss = {2}, val_loss index = {3}, min val_loss = {4}".format( procIndex, iterIndex, current_min_loss_val, current_min_loss_index, self.bestFitResult.val_loss ) )
         return history
 
@@ -156,7 +163,7 @@ class LearningModel:
         # type: (FitResult, str) -> None
         plt.title(title)
         print "Plotting result: " + title
-        print " ---> NEpocs = {0}, loss = {1}".format(fitResult.nEpocs, fitResult.val_loss)
+        print " ---> NEpocs = {0}, loss = {1}, loss history = {2}".format(fitResult.nEpocs, fitResult.val_loss, str(fitResult.val_loss_history))
 
         model1 = self.getFittedModel(fitResult)
         prediction1 = model1.predict( self.inputData )

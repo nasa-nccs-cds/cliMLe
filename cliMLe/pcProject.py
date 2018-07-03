@@ -2,6 +2,7 @@ import os, sys, math
 import cdms2 as cdms
 import numpy as np
 from typing import List, Union
+from cliMLe.dataProcessing import PreProc
 
 PC = 0
 EOF = 1
@@ -64,10 +65,19 @@ class Experiment:
 
 class PCDataset:
 
-    def __init__(self, _experiments, _normalize = True ):
-       self.normalize = _normalize
+    def __init__(self, _experiments, **kwargs ):
+       self.normalize = kwargs.get("norm",True)
+       self.nTSteps = kwargs.get( "nts", 1 )
+       self.smooth = kwargs.get( "smooth", 0 )
        self.experiments = _experiments if isinstance( _experiments, (list, tuple) ) else [ _experiments ] # type: List[Experiment]
-       self.data = np.column_stack([self.preprocess(var[:].data) for var in self.getVariables()])
+       input_cols = []
+       for iTS in range( self.nTSteps ):
+           iTS_cols = [self.preprocess(var,iTS) for var in self.getVariables()]
+           input_cols.extend( iTS_cols )
+           print " iTS = "+ str( iTS )
+           for iTS_col in iTS_cols:
+               print " TS Col: shape = {0}, start = {1}, end = {2}".format( str(iTS_col.shape), str( iTS_col[0:3] ), str( iTS_col[-3:] ) )
+       self.data = np.column_stack( input_cols )
 
     def getVariables(self):
         # type: () -> list[cdms.tvariable.TransientVariable]
@@ -81,18 +91,18 @@ class PCDataset:
         size = 0
         for experiment in self.experiments:
             size += experiment.nModes
-        return size
+        return size * self.nTSteps
 
     def getVariableIds(self):
         # type: () -> str
         return "[" + ",".join( exp.variable.id for exp in self.experiments ) +"]"
 
-    def preprocess(self, data ):
-        if self.normalize:
-            std = np.std( data, 0 )
-            return data / std
-        else:
-            return data
+    def preprocess(self, var, offset=0 ):
+        end = var.shape[0] - (self.nTSteps-offset) + 1
+        data = var.data[offset:end]
+        norm_data = PreProc.normalize( data ) if self.normalize else data
+        smoothed_data = PreProc.lowpass( norm_data, self.smooth ) if self.smooth else norm_data
+        return smoothed_data
 
     def getEpoch(self):
         # type: () -> np.ndarray

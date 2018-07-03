@@ -3,6 +3,7 @@ import cdms2 as cdms
 import numpy as np
 from cdms2.selectors import Selector
 import matplotlib.pyplot as plt
+from cliMLe.dataProcessing import PreProc
 
 class DataSource:
 
@@ -22,18 +23,22 @@ class ProjectDataSource(DataSource):
         self.dataFile = os.path.join( os.path.join( self.rootDir, "data" ), name + ".nc" )
         self.variables = variableList
 
-    def getTimeseries(self, normalize = True ):
+    def getTimeseries( self, **kwargs ):
         # type: (bool) -> list[(str,np.ndarray)]
         dset = cdms.open( self.dataFile )
+        normalize = kwargs.get( "norm", True )
+        smooth = kwargs.get( "smooth", 0 )
+        offset = kwargs.get( "offset", 0 )
+        length = kwargs.get( "length", -1 )
         norm_timeseries = []
         for varName in self.variables:
             variable =  dset.getVariable( varName )
-            timeseries =  variable(self.selector).data
-            if normalize:
-                std = np.std( timeseries, 0 )
-                norm_timeseries.append( (varName, timeseries / std) )
-            else:
-                norm_timeseries.append( (varName, timeseries) )
+            timeseries =  variable(self.selector).data  # type: np.ndarray
+            if( length == -1 ): length = timeseries.shape[0] - offset
+            offset_data = timeseries[offset:offset+length]
+            norm_data = PreProc.normalize( offset_data ) if normalize else offset_data
+            smoothed_data = PreProc.lowpass( norm_data, smooth ) if smooth else norm_data
+            norm_timeseries.append( (varName, smoothed_data ) )
         dset.close()
         return norm_timeseries
 
@@ -44,9 +49,11 @@ class ProjectDataSource(DataSource):
 
 class TrainingDataset:
 
-    def __init__(self, sources = [] ):
-        # type: (list[DataSource]) -> object
+    def __init__(self, sources = [], **kwargs ):
+        # type: (list[DataSource]) -> None
         self.dataSources = sources
+        self.offset = kwargs.get("offset",0)
+        self.smooth = kwargs.get("smooth",0)
         self.data = np.column_stack([tsdata for (tsname, tsdata) in self.getTimeseries()])
         self.output_size = self.data.shape[1]
 
@@ -56,13 +63,13 @@ class TrainingDataset:
     def getTimeseries(self):
         # type: (bool) -> list[(str,np.ndarray)]
         timeseries = []
-        for dsource in self.dataSources: timeseries.extend( dsource.getTimeseries() )
+        for dsource in self.dataSources: timeseries.extend( dsource.getTimeseries( offset=self.offset, smooth=self.smooth ) )
         return timeseries
 
     def plotTimeseries(self):
         plt.title("Training data")
         for dsource in self.dataSources: 
-            for (tsname,tsdata) in dsource.getTimeseries():
+            for (tsname,tsdata) in dsource.getTimeseries( offset=self.offset, smooth=self.smooth ):
                 plt.plot( tsdata, label = tsname )
         plt.legend()
         plt.show()

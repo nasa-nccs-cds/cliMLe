@@ -15,14 +15,14 @@ variables = [ Variable("ts") ]
 project = Project(outDir,projectName)
 pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable) for variable in variables ] )
 
-nIterations = 10
+prediction_lag = 6
+nIterations = 100
 batchSize = 50
-nEpocs = 400
-validation_fraction = 0.25
+nEpocs = 300
+validation_fraction = 0.15
 hiddenLayers = [8]
 activation = "relu"
 plotPrediction = True
-prediction_lag = 0
 
 training_time_range = ( "1980-{0}-1".format(prediction_lag+1), "2014-12-1" if prediction_lag == 0 else "2015-{0}-1".format(prediction_lag) )
 td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], training_time_range ) # , "pdo_timeseries_mon", "indian_ocean_dipole", "nino34"

@@ -1,5 +1,7 @@
 from keras.models import Sequential, Model
 from keras.layers import Dense, Activation
+from typing import Optional, Any
+
 from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
 from cliMLe.trainingData import *
 import time, keras
@@ -21,15 +23,16 @@ logging.basicConfig(filename=LOG_FILE,level=logging.DEBUG)
 class FitResult:
 
     @staticmethod
-    def new( history, initial_weights, val_loss,  nEpocs):
+    def new( history, initial_weights, training_loss, val_loss,  nEpocs):
         # type: (History, list[np.ndarray], float, int) -> FitResult
-        return FitResult( history.history['val_loss'], initial_weights, history.model.get_weights(),  val_loss, nEpocs )
+        return FitResult( history.history['val_loss'], initial_weights, history.model.get_weights(),  training_loss, val_loss, nEpocs )
 
-    def __init__( self, _val_loss_history, _initial_weights, _final_weights,  _val_loss, _nEpocs ):
+    def __init__( self, _val_loss_history, _initial_weights, _final_weights, _training_loss,  _val_loss, _nEpocs ):
         self.val_loss_history = _val_loss_history
         self.initial_weights = _initial_weights
         self.final_weights = _final_weights
         self.val_loss = _val_loss
+        self.train_loss = _training_loss
         self.nEpocs = _nEpocs
 
     def valLossHistory(self):
@@ -152,15 +155,18 @@ class LearningModel:
     def updateHistory( self, history, initial_weights, iterIndex, procIndex ):
         # type: (History, list[np.ndarray], int, int) -> History
         val_loss = history.history['val_loss']
+        training_loss = history.history['loss'][-1]
         current_min_loss_val, current_min_loss_index = min( (val_loss[i],i) for i in xrange(len(val_loss)) )
         if not self.bestFitResult or (current_min_loss_val < self.bestFitResult.val_loss ):
-            self.bestFitResult = FitResult.new( history, initial_weights, current_min_loss_val, current_min_loss_index )
+            self.bestFitResult = FitResult.new( history, initial_weights, training_loss, current_min_loss_val, current_min_loss_index )
         if procIndex < 0:   print "Executed iteration {0}, current loss = {1}  (NE={2}), best loss = {3} (NE={4})".format(iterIndex, current_min_loss_val, current_min_loss_index, self.bestFitResult.val_loss, self.bestFitResult.nEpocs )
         else:               logging.info( "PROC[{0}]: Iteration {1}, val_loss = {2}, val_loss index = {3}, min val_loss = {4}".format( procIndex, iterIndex, current_min_loss_val, current_min_loss_index, self.bestFitResult.val_loss ) )
         return history
 
-    def plotPrediction( self, fitResult, title ):
+    def plotPrediction( self, fitResult, title, **kwargs ):
         # type: (FitResult, str) -> None
+        plotFinal = kwargs.get("plotFinal", False)
+        refData = kwargs.get("ref", None )  # type: dict[str,np.ndarray]
         plt.title(title)
         print "Plotting result: " + title
         print " ---> NEpocs = {0}, loss = {1}, loss history = {2}".format(fitResult.nEpocs, fitResult.val_loss, str(fitResult.val_loss_history))
@@ -169,11 +175,17 @@ class LearningModel:
         prediction1 = model1.predict( self.inputData )
         plt.plot(prediction1, label="prediction: fitted" )
 
-        model2 = self.getFinalModel(fitResult)
-        prediction2 = model2.predict( self.inputData )
-        plt.plot(prediction2, label="prediction: final" )
+        if plotFinal:
+            model2 = self.getFinalModel(fitResult)
+            prediction2 = model2.predict( self.inputData )
+            plt.plot(prediction2, label="prediction: final" )
 
         plt.plot( self.outputData, label="training data" )
+
+        if refData is not None:
+            for key, value in refData:
+                plt.plot(value, label= key + " ref (lag 0)" )
+
         plt.legend()
         plt.show()
 

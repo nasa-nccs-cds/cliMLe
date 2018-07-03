@@ -31,16 +31,3 @@ trainingDataset = TrainingDataset( [td] )
 def learning_model_factory( weights = None ):
     print "Creating Learning Model"
     return LearningModel( pcDataset, trainingDataset, batch=batchSize, epocs=nEpocs, vf=validation_fraction, hidden=hiddenLayers, activation=activation, weights=weights )
-
-plt.title("Diagnostics")
-
-prediction1 =
-plt.plot(prediction1, label="prediction: fitted" )
-
-model2 = self.getFinalModel(fitResult)
-prediction2 = model2.predict( self.inputData )
-plt.plot(prediction2, label="prediction: final" )
-
-plt.plot( self.outputData, label="training data" )
-plt.legend()
-plt.show()

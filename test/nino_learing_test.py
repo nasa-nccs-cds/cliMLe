@@ -17,13 +17,13 @@ nModes = 32
 variables = [ Variable("ts") ]
 project = Project(outDir,projectName)
 pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable) for variable in variables ] )
-nInterations = 100
+nInterations = 10
 
 batchSize = 50
 nEpocs = 300
 validation_fraction = 0.1
 lag = 0
-nHiddenUnits = 16
+nHiddenUnits = 8
 timestamp = datetime.now().strftime("%m-%d-%y.%H:%M:%S")
 time_range = ( "1980-{0}-1".format(lag+1), "2014-12-1" if lag == 0 else "2015-{0}-1".format(lag) )
 logDir = os.path.expanduser("~/results/logs/{}".format( projectName + "_" + timestamp ) )

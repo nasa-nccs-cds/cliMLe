@@ -15,11 +15,11 @@ variables = [ Variable("ts") ]
 project = Project(outDir,projectName)
 pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable) for variable in variables ] )
 
-nIterations = 50
+nIterations = 10
 batchSize = 100
 nEpocs = 300
 validation_fraction = 0.25
-hiddenLayers = []
+hiddenLayers = [8]
 activation = "relu"
 plotPrediction = True
 prediction_lag = 0

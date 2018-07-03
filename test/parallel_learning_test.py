@@ -20,7 +20,7 @@ nInterationsPerProc = 10
 batchSize = 100
 nEpocs = 200
 validation_fraction = 0.1
-hiddenLayers = []
+hiddenLayers = [8]
 activation = "relu"
 plotPrediction = True
 

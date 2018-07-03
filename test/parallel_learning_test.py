@@ -17,15 +17,15 @@ pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable)
 
 prediction_lag = 0
 nInterationsPerProc = 10
-batchSize = 100
-nEpocs = 200
+batchSize = 50
+nEpocs = 300
 validation_fraction = 0.1
 hiddenLayers = [8]
 activation = "relu"
 plotPrediction = True
 
 training_time_range = ( "1980-{0}-1".format(prediction_lag+1), "2014-12-1" if prediction_lag == 0 else "2015-{0}-1".format(prediction_lag) )
-td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "amo_timeseries_mon" ], training_time_range ) # , "pdo_timeseries_mon", "indian_ocean_dipole", "nino34"
+td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], training_time_range ) # , "pdo_timeseries_mon", "indian_ocean_dipole", "nino34"
 trainingDataset = TrainingDataset( [td] )
 
 def learning_model_factory( weights = None ):

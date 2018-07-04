@@ -3,15 +3,15 @@ import cdms2 as cdms
 import numpy as np
 
 class PreProc:
+    smoothing_kernel = np.array([.13, .23, .28, .23, .13])
 
     @staticmethod
-    def normalize( data ):
+    def normalize( data, axis=0 ):
         # type: (np.ndarray) -> np.ndarray
-        std = np.std( data, 0 )
+        std = np.std( data, axis )
         return data / std
 
-    @staticmethod
-    def lowpass( data, kernel_size ):
+    @classmethod
+    def lowpass( cls, data ):
         # type: (np.ndarray) -> np.ndarray
-        kernel = np.array( [ .13, .23, .28, .23, .13 ])
-        return np.convolve( data, kernel, "same")
+        return np.convolve( data, cls.smoothing_kernel, "same")

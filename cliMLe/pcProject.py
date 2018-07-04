@@ -72,11 +72,7 @@ class PCDataset:
        self.experiments = _experiments if isinstance( _experiments, (list, tuple) ) else [ _experiments ] # type: List[Experiment]
        input_cols = []
        for iTS in range( self.nTSteps ):
-           iTS_cols = [self.preprocess(var,iTS) for var in self.getVariables()]
-           input_cols.extend( iTS_cols )
-           print " iTS = "+ str( iTS )
-           for iTS_col in iTS_cols:
-               print " TS Col: shape = {0}, start = {1}, end = {2}".format( str(iTS_col.shape), str( iTS_col[0:3] ), str( iTS_col[-3:] ) )
+           input_cols.extend( [self.preprocess(var,iTS) for var in self.getVariables()] )
        self.data = np.column_stack( input_cols )
 
     def getVariables(self):
@@ -101,8 +97,8 @@ class PCDataset:
         end = var.shape[0] - (self.nTSteps-offset) + 1
         data = var.data[offset:end]
         norm_data = PreProc.normalize( data ) if self.normalize else data
-        smoothed_data = PreProc.lowpass( norm_data, self.smooth ) if self.smooth else norm_data
-        return smoothed_data
+        for iS in range( self.smooth ): norm_data = PreProc.lowpass( norm_data )
+        return norm_data
 
     def getEpoch(self):
         # type: () -> np.ndarray

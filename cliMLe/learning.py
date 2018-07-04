@@ -38,6 +38,9 @@ class FitResult:
     def valLossHistory(self):
         return self.val_loss_history
 
+    def isMature(self):
+        return self.val_loss < self.train_loss
+
     def __lt__(self, other ):
         # type: (FitResult) -> bool
         return self.val_loss < other.val_loss
@@ -55,8 +58,9 @@ class FitResult:
         # type: (list[FitResult]) -> FitResult
         bestResult = None
         for result in results:
-            if bestResult is None or result < bestResult:
-                bestResult = result
+            if result.isMature:
+                if bestResult is None or result < bestResult:
+                    bestResult = result
         return bestResult
 
 class LearningModel:
@@ -215,10 +219,10 @@ class LearningModel:
         try:
             resultQueue = mp.Queue()
 
-            print " ** Executing {0} iterations on each of {1} processors for a total of {2} interations, logging to {3}".format(nIterPerProc,nProc,nIterPerProc*nProc,LOG_FILE)
+            print " ** Executing {0} iterations on each of {1} processors for a total of {2} iterations, logging to {3}".format(nIterPerProc,nProc,nIterPerProc*nProc,LOG_FILE)
 
             for iProc in range(nProc):
-                print " ** Executing process " + str(iProc)
+                print " ** Executing process " + str(iProc) + ": NIterations: " + str(nIterPerProc)
                 proc = mp.Process(target=cls.serial_execute, args=(learning_model_factory, nIterPerProc, iProc, resultQueue))
                 proc.start()
                 learning_processes.append(proc)

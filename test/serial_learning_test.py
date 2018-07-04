@@ -26,10 +26,9 @@ plotPrediction = True
 
 training_time_range = ( "1980-{0}-1".format(prediction_lag+1), "2014-12-1" if prediction_lag == 0 else "2015-{0}-1".format(prediction_lag) )
 td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], training_time_range ) # , "pdo_timeseries_mon", "indian_ocean_dipole", "nino34"
-trainingDataset = TrainingDataset( [td] )
+trainingDataset = TrainingDataset( [td], pcDataset )
 
 def learning_model_factory():
-    print "Creating Learning Model"
     return LearningModel( pcDataset, trainingDataset, batch=batchSize, epocs=nEpocs, vf=validation_fraction, hidden=hiddenLayers, activation=activation )
 
 result = LearningModel.serial_execute( learning_model_factory, nIterations )

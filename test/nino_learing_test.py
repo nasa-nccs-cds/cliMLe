@@ -32,11 +32,11 @@ logDir = os.path.expanduser("~/results/logs/{}".format( projectName + "_" + time
 plotPrediction = True
 
 td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "amo_timeseries_mon" ], time_range ) # , "pdo_timeseries_mon", "indian_ocean_dipole", "nino34"
-dset = TrainingDataset( [td] )
+dset = TrainingDataset( [td], pcDataset )
 x = pcDataset.getEpoch()
 y = dset.getEpoch()
 tensorboard = TensorBoard( log_dir=logDir, histogram_freq=0, write_graph=True )
-trainingDataset = TrainingDataset( [td] )
+trainingDataset = TrainingDataset( [td], pcDataset )
 
 bestFitResult = None  # type: FitResult
 for iterIndex in range(nInterations):
@@ -53,7 +53,6 @@ for iterIndex in range(nInterations):
     print "Iteration {0}, val_loss = {1}, val_loss index = {2}, min val_loss = {3}".format( iterIndex, current_min_loss_val, current_min_loss_index, bestFitResult.val_loss )
 
 def learning_model_factory():
-    print "Creating Learning Model"
     return LearningModel( pcDataset, trainingDataset, batch=batchSize, epocs=nEpocs, vf=validation_fraction, hidden=hiddenLayers, activation=activation )
 
 if plotPrediction:

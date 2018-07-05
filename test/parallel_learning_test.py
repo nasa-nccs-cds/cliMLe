@@ -8,18 +8,18 @@ start_year = 1980
 end_year = 2015
 nModes = 32
 nTS = 1
-smooth = 2
+smooth = 0
 
 variables = [ Variable("ts") ] # , Variable( "zg", 50000 ) ]
 project = Project(outDir,projectName)
 pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable) for variable in variables ], nts = nTS, smooth = smooth )
 
 prediction_lag = 6
-nInterationsPerProc = 15
+nInterationsPerProc = 10
 batchSize = 100
 nEpocs = 200
 validation_fraction = 0.15
-hiddenLayers = [200]
+hiddenLayers = [100]
 activation = "relu"
 plotPrediction = True
 

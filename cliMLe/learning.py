@@ -79,7 +79,7 @@ class LearningModel:
         self.projectName = self.inputs.experiments[0].project.name
         self.logDir = os.path.expanduser("~/results/logs/{}".format( self.projectName + "_" + self.timestamp ) )
         self.inputData = self.inputs.getEpoch()
-        self.outputData = self.outputs.getEpoch()
+        self.dates, self.outputData = self.outputs.getEpoch()
         self.tensorboard = TensorBoard( log_dir=self.logDir, histogram_freq=0, write_graph=True )
         self.bestFitResult = None # type: FitResult
         self.weights_template = self.createSequentialModel().get_weights()
@@ -141,7 +141,7 @@ class LearningModel:
         # type: () -> Sequential
         model = Sequential()
         nHidden = len(self.hidden)
-        nOutputs = self.outputs.output_size
+        nOutputs = self.outputs.getOutputSize()
         nInputs = self.inputs.getInputDimension()
 
         for hIndex in range(nHidden):
@@ -177,18 +177,18 @@ class LearningModel:
 
         model1 = self.getFittedModel(fitResult)
         prediction1 = model1.predict( self.inputData )
-        plt.plot(prediction1, label="prediction: fitted" )
+        plt.plot_date(self.dates, prediction1, "-", label="prediction: fitted" )
 
         if plotFinal:
             model2 = self.getFinalModel(fitResult)
             prediction2 = model2.predict( self.inputData )
-            plt.plot(prediction2, label="prediction: final" )
+            plt.plot_date(self.dates, prediction2, "-", label="prediction: final" )
 
-        plt.plot( self.outputData, label="training data" )
+        plt.plot_date(self.dates, self.outputData, "-", label="training data" )
 
         if refData is not None:
             for key, value in refData:
-                plt.plot(value, label= key + " ref (lag 0)" )
+                plt.plot_date(self.dates, value, "-", label= key + " ref (lag 0)" )
 
         plt.legend()
         plt.show()

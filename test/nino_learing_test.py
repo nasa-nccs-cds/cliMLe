@@ -34,7 +34,7 @@ plotPrediction = True
 td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "amo_timeseries_mon" ], time_range ) # , "pdo_timeseries_mon", "indian_ocean_dipole", "nino34"
 dset = TrainingDataset( [td], pcDataset )
 x = pcDataset.getEpoch()
-y = dset.getEpoch()
+dates, y = dset.getEpoch()
 tensorboard = TensorBoard( log_dir=logDir, histogram_freq=0, write_graph=True )
 trainingDataset = TrainingDataset( [td], pcDataset )
 

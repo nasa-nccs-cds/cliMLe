@@ -1,6 +1,7 @@
 import os, itertools, datetime
 import cdms2 as cdms
 import numpy as np
+import logging, traceback
 from cdms2.selectors import Selector
 import matplotlib.pyplot as plt
 from cliMLe.dataProcessing import PreProc, CTimeRange, CDuration
@@ -33,14 +34,14 @@ class DataSource:
 
 class ProjectDataSource(DataSource):
 
-    def __init__(self, name, variableList, time_bounds ):
+    def __init__(self, name, variableList ):
         DataSource.__init__( self, name )
         self.variables = variableList
         self.dataFile = self.getDataFilePath("cvdp","nc")
         self.variables = variableList
 
     def getTimeseries( self, timeRange, **kwargs ):
-        # type: ( Union[bool,int] ) -> TimeseriesData
+        # type: ( CTimeRange ) -> TimeseriesData
         dset = cdms.open( self.dataFile )
         normalize = kwargs.get( "norm", True )
         smooth = kwargs.get( "smooth", 0 )
@@ -48,7 +49,8 @@ class ProjectDataSource(DataSource):
         length = kwargs.get( "length", -1 )
         norm_timeseries = []
         dates = None
-        selector = timeRange.getSelector() if timeRange else None
+        selector = timeRange.selector() if timeRange else None
+        logging.info( "TrainingData: variables = {0}, time range = {1}".format( str(self.variables), str(selector)))
         for varName in self.variables:
             variable =  dset( varName, selector ) if selector else dset( varName ) # type: cdms.tvariable.TransientVariable
             if dates is None:
@@ -99,6 +101,7 @@ class IITMDataSource(DataSource):
         smooth = kwargs.get("smooth", 0)
         timeseries = []
         dates = []
+        logging.info("TrainingData: name = {0}, time range = {1}".format(str(self.name), str(timeRange)))
         for iLine in range( len(lines) ):
             line_elems = lines[iLine].split()
             if self.isYear(line_elems[0]):

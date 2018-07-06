@@ -3,7 +3,7 @@ import cdms2 as cdms
 import numpy as np
 from cdms2.selectors import Selector
 import matplotlib.pyplot as plt
-from cliMLe.dataProcessing import PreProc
+from cliMLe.dataProcessing import PreProc, CTimeRange, CDuration
 from typing import List, Union, Dict, Any
 from cliMLe.pcProject import PCDataset
 
@@ -18,44 +18,28 @@ class TimeseriesData:
 
 class DataSource:
 
-    def __init__(self, name, time_bounds ):
-         # type: (str,(str,str)) -> None
-        self.time_bounds = time_bounds
+    def __init__(self, name ):
+         # type: (str) -> None
         self.name = name
         self.rootDir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-        self.dateRange = self.getDateRange()
 
     def getDataFilePath(self, type, ext ):
         # type: (str,str) -> str
         return os.path.join(os.path.join(self.rootDir, "data",type), self.name + "." + ext )
 
-    def getDateRange(self):
-        # type: () -> [ datetime.date, datetime.date ]
-        return [ self.toDate( dateStr ) for dateStr in self.time_bounds ]
-
-    def toDate( self, dateStr ):
-        # type: (str) -> datetime.date
-        toks = [ int(tok) for tok in dateStr.split("-") ]
-        return datetime.date( toks[0], toks[1], toks[2] )
-
-    def inDateRange( self, date ):
-        # type: (datetime.date) -> bool
-        return date >= self.dateRange[0] and date <= self.dateRange[1]
-
-    def getTimeseries( self, **kwargs ): raise NotImplementedError
+    def getTimeseries( self, timeRange, **kwargs ): raise NotImplementedError
         # type: ( Union[bool,int] ) -> TimeseriesData
 
 
 class ProjectDataSource(DataSource):
 
     def __init__(self, name, variableList, time_bounds ):
-        DataSource.__init__( self, name, time_bounds )
+        DataSource.__init__( self, name )
         self.variables = variableList
-        self.selector = Selector(time=self.time_bounds )
         self.dataFile = self.getDataFilePath("cvdp","nc")
         self.variables = variableList
 
-    def getTimeseries( self, **kwargs ):
+    def getTimeseries( self, timeRange, **kwargs ):
         # type: ( Union[bool,int] ) -> TimeseriesData
         dset = cdms.open( self.dataFile )
         normalize = kwargs.get( "norm", True )
@@ -64,13 +48,13 @@ class ProjectDataSource(DataSource):
         length = kwargs.get( "length", -1 )
         norm_timeseries = []
         dates = None
+        selector = timeRange.getSelector() if timeRange else None
         for varName in self.variables:
-            variable =  dset.getVariable( varName )   # type: cdms.fvariable.FileVariable
-            subset_variable = variable(self.selector) # type: cdms.tvariable.TransientVariable
+            variable =  dset( varName, selector ) if selector else dset( varName ) # type: cdms.tvariable.TransientVariable
             if dates is None:
-                timeAxis = subset_variable.getTime()      # type: cdms.axis.Axis
+                timeAxis = variable.getTime()      # type: cdms.axis.Axis
                 dates = [ datetime.date() for datetime in timeAxis.asdatetime() ]
-            timeseries =  subset_variable.data  # type: np.ndarray
+            timeseries =  variable.data  # type: np.ndarray
             if( length == -1 ): length = timeseries.shape[0] - offset
             offset_data = timeseries[offset:offset+length]
             norm_data = PreProc.normalize( offset_data ) if normalize else offset_data
@@ -87,9 +71,9 @@ class ProjectDataSource(DataSource):
 
 class IITMDataSource(DataSource):
 
-    def __init__(self, name, _type, time_bounds):
-        # type: ( str, str, (str,str) ) -> None
-        DataSource.__init__(self, name, time_bounds)
+    def __init__(self, name, _type):
+        # type: ( str, str ) -> None
+        DataSource.__init__(self, name)
         self.type = _type.lower()
         self.dataFile = self.getDataFilePath("IITM","txt")
 
@@ -107,14 +91,12 @@ class IITMDataSource(DataSource):
         else:
             raise Exception( "Unrecognized Data source type: " + self.type )
 
-    def getTimeseries(self, **kwargs):
+    def getTimeseries(self, timeRange, **kwargs):
         # type: ( Union[bool,int] ) -> TimeseriesData
         dset = open(self.dataFile,"r")
         lines = dset.readlines()
         normalize = kwargs.get("norm", True)
         smooth = kwargs.get("smooth", 0)
-        offset = kwargs.get("offset", 0)
-        length = kwargs.get("length", -1)
         timeseries = []
         dates = []
         for iLine in range( len(lines) ):
@@ -125,19 +107,18 @@ class IITMDataSource(DataSource):
                     for iMonth in range(1,13):
                         value = float( line_elems[ iMonth ] )
                         date = datetime.date(iYear, iMonth, 15)
-                        if self.inDateRange(date):
+                        if  not timeRange or timeRange.inDateRange(date):
                             timeseries.append( value )
                             dates.append( date )
                 else:
                     colIndex, iMonth = self.getTypeIndices()
                     value = float( line_elems[ colIndex ] )
                     date = datetime.date(iYear, iMonth, 15)
-                    if self.inDateRange(date):
+                    if not timeRange or timeRange.inDateRange(date):
                         timeseries.append( value )
                         dates.append( date )
-        if (length == -1): length = len(timeseries) - offset
-        offset_data = np.array( timeseries[offset:offset + length] )
-        norm_data = PreProc.normalize(offset_data) if normalize else offset_data
+        tsarray = np.array( timeseries )
+        norm_data = PreProc.normalize(tsarray) if normalize else tsarray
         for iS in range(smooth): norm_data = PreProc.lowpass(norm_data)
         return TimeseriesData( dates, [ ( self.type, norm_data ) ] )
 
@@ -151,12 +132,20 @@ class IITMDataSource(DataSource):
 
 class TrainingDataset:
 
-    def __init__(self, sources, _inputDataset = None, **kwargs ):
-        # type: ( list[DataSource], PCDataset, Union[bool, str, float] ) -> None
+    def __init__(self, sources, _predictionLag, **kwargs ):
+        # type: ( list[DataSource], CDuration ) -> None
         self.dataSources = sources
-        self.offset = _inputDataset.nTSteps - 1 if _inputDataset is not None else 0
-        self.smooth = _inputDataset.smooth if _inputDataset is not None else 0
+        self.smooth = kwargs.get("smooth",0)
+        self.trainingRange = kwargs.get( "trainingRange", None ) # type: CTimeRange
         self._timeseries = []
+
+    @classmethod
+    def new(cls, sources, inputDataset, predictionLag, **kwargs):
+        # type: ( list[DataSource], PCDataset, CDuration ) -> TrainingDataset
+        offset = inputDataset.nTSteps - 1 if inputDataset is not None else 0
+        smooth = inputDataset.smooth if inputDataset is not None else 0
+        trainingRange = inputDataset.timeRange.shift(predictionLag.inc(offset))
+        return cls( sources, predictionLag, smooth=smooth, trainingRange=trainingRange )
 
     def addDataSource(self, dsource ):
         # type: (DataSource) -> None
@@ -165,17 +154,17 @@ class TrainingDataset:
     def getTimeseries(self):
         # type: () -> ( list[TimeseriesData] )
         if len( self._timeseries ) == 0:
-            self._timeseries = [ dsource.getTimeseries(offset=self.offset, smooth=self.smooth) for dsource in self.dataSources]  # type: List[TimeseriesData]
+            self._timeseries = [ dsource.getTimeseries( self.trainingRange, smooth=self.smooth ) for dsource in self.dataSources]  # type: List[TimeseriesData]
         return self._timeseries
 
     def getTimeseriesData(self):
-        # type: (bool) -> ( list[dates], list[np.ndarray] )
+        # type: (bool) -> ( list(datetime.date), list[np.ndarray] )
         timeseries = self.getTimeseries() # type: List[TimeseriesData]
         tsdata = []
         for ts in timeseries: tsdata.extend( ts.series.values())
         return ( timeseries[0].dates, tsdata )
 
-    def plotTimeseries(self):
+    def plotTimeseries( self ):
         plt.title("Training data")
         timeseries = self.getTimeseries() # type: List[TimeseriesData]
         for tsdata in timeseries:
@@ -184,7 +173,7 @@ class TrainingDataset:
         plt.legend()
         plt.show()
 
-    def getEpoch(self):
+    def getEpoch( self ):
         # type: () -> ( list[dates], np.ndarray )
         dates, series = self.getTimeseriesData()
         return dates, np.column_stack( series )
@@ -198,6 +187,6 @@ if __name__ == "__main__":
 #    td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "indian_ocean_dipole", "pdo_timeseries_mon", "amo_timeseries_mon" ], ( "1980-1-1", "2014-12-31" ) )
 #    print "Variables: " + str( td.listVariables() )
 
-    td = IITMDataSource( "AI", "monsoon", ( "1813-1-1", "2006-12-31" )  )
-    dset = TrainingDataset( [td] )
+    td = IITMDataSource( "AI", "monsoon"  )
+    dset = TrainingDataset( [td], 0 )
     dset.plotTimeseries()

@@ -1,8 +1,9 @@
 import os, sys, math
 import cdms2 as cdms
+import logging, traceback
 import numpy as np
 from typing import List, Union
-from cliMLe.dataProcessing import PreProc
+from cliMLe.dataProcessing import PreProc, CTimeRange, CDuration
 
 PC = 0
 EOF = 1
@@ -50,26 +51,30 @@ class Experiment:
         filePath = self.outfilePath( rType )
         return cdms.open(filePath)
 
-    def getVariable( self, varName, rType ):
+    def getVariable( self, varName, rType, selector = None ):
         # type: (str, int) -> cdms.fvariable.FileVariable
         dataset = self.getDataset( rType )
-        return dataset(varName)
+        return dataset(varName,selector) if selector else dataset(varName)
 
-    def getVariables( self, rType ):
+    def getVariables( self, rType, selector = None ):
         # type: (int) -> list[cdms.tvariable.TransientVariable]
         dataset = self.getDataset( rType )
         varnames = [ vname for vname in dataset.listvariables() if not vname.endswith("_bnds") ]
         varnames.sort()
-        return [ dataset(varName) for varName in varnames ]
+        logging.info( "Get Input PC timeseries, vars: {0}, range: {1}".format( str(varnames), str(selector) ) )
+        return [ dataset(varName,selector) for varName in varnames ] if selector else [ dataset(varName) for varName in varnames ]
 
 
 class PCDataset:
 
     def __init__(self, _experiments, **kwargs ):
+       # type: ( list[Experiment] ) -> None
+       self.timeRange = kwargs.get( "timeRange", None ) # type: CTimeRange
        self.normalize = kwargs.get("norm",True)
        self.nTSteps = kwargs.get( "nts", 1 )
        self.smooth = kwargs.get( "smooth", 0 )
        self.experiments = _experiments if isinstance( _experiments, (list, tuple) ) else [ _experiments ] # type: List[Experiment]
+       self.selector = self.timeRange.selector() if self.timeRange else None
        input_cols = []
        for iTS in range( self.nTSteps ):
            input_cols.extend( [self.preprocess(var,iTS) for var in self.getVariables()] )
@@ -79,7 +84,7 @@ class PCDataset:
         # type: () -> list[cdms.tvariable.TransientVariable]
         variable_list = []
         for experiment in self.experiments:
-            variable_list.extend( experiment.getVariables( PC ) )
+            variable_list.extend( experiment.getVariables( PC, self.selector ) )
         return variable_list
 
     def getInputDimension(self):

@@ -10,10 +10,6 @@ nModes = 32
 nTS = 1
 smooth = 0
 
-variables = [ Variable("ts") ] # , Variable( "zg", 50000 ) ]
-project = Project(outDir,projectName)
-pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable) for variable in variables ], nts = nTS, smooth = smooth )
-
 prediction_lag = 6
 nInterationsPerProc = 10
 batchSize = 100
@@ -22,8 +18,11 @@ validation_fraction = 0.15
 hiddenLayers = [100]
 activation = "relu"
 plotPrediction = True
-
 training_time_range = ( "1980-{0}-1".format(prediction_lag+1), "2014-12-1" if prediction_lag == 0 else "2015-{0}-1".format(prediction_lag) )
+
+variables = [ Variable("ts") ] # , Variable( "zg", 50000 ) ]
+project = Project(outDir,projectName)
+pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable) for variable in variables ], training_time_range, nts = nTS, smooth = smooth )
 td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], training_time_range ) # , "pdo_timeseries_mon", "indian_ocean_dipole", "nino34"
 trainingDataset = TrainingDataset( [td], pcDataset )
 

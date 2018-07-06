@@ -1,6 +1,7 @@
 from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
 from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
+from cliMLe.dataProcessing import CTimeRange, CDuration
 outDir = os.path.expanduser("~/results")
 
 pname = "20CRv2c"
@@ -8,25 +9,25 @@ projectName = pname + "_EOFs"
 start_year = 1851
 end_year = 2012
 nModes = 64
-nTS = 2
+nTS = 1
 smooth = 0
+learning_range = CTimeRange.new( "1851-1-1", "2005-12-1" )
 
 variables = [ Variable("ts"), Variable( "zg", 80000 ), Variable( "zg", 50000 ), Variable( "zg", 25000 ) ]
 project = Project(outDir,projectName)
-pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable) for variable in variables ], nts = nTS, smooth = smooth )
+pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable) for variable in variables ], nts = nTS, smooth = smooth, timeRange = learning_range )
 
-prediction_lag = 1
-nInterationsPerProc = 10
+prediction_lag = CDuration.months(1)
+nInterationsPerProc = 3
 batchSize = 100
 nEpocs = 200
 validation_fraction = 0.15
-hiddenLayers = [100]
+hiddenLayers = [32]
 activation = "relu"
 plotPrediction = True
 
-training_time_range = ( "1980-{0}-1".format(prediction_lag+1), "2014-12-1" if prediction_lag == 0 else "2015-{0}-1".format(prediction_lag) )
-td = IITMDataSource( "AI", "monthly", training_time_range )
-trainingDataset = TrainingDataset( [td], pcDataset )
+td = IITMDataSource( "AI", "monthly" )
+trainingDataset = TrainingDataset.new( [td], pcDataset, prediction_lag )
 
 #ref_time_range = ( "1980-1-1", "2014-12-1" )
 #ref_ts = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], ref_time_range )

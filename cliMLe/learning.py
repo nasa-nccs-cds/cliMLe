@@ -71,6 +71,7 @@ class LearningModel:
         self.batchSize = kwargs.get( 'batch', 50 )
         self.nEpocs = kwargs.get( 'epocs', 300 )
         self.validation_fraction = kwargs.get(  'vf', 0.1 )
+        self.timeRange = kwargs.get(  'timeRange', None )
         self.hidden = kwargs.get(  'hidden', [16] )
         self.shuffle = kwargs.get('shuffle', False )
         self.weights = kwargs.get(  'weights', None )

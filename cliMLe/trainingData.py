@@ -158,6 +158,7 @@ class TrainingDataset:
         offset = inputDataset.nTSteps - 1 if inputDataset is not None else 0
         smooth = inputDataset.smooth if inputDataset is not None else 0
         trainingRange = inputDataset.timeRange.shift(predictionLag.inc(offset))
+ #       trainingRange1 = trainingRange.extend( CDuration.months( offset ) )
         return cls( sources, predictionLag, smooth=smooth, trainingRange=trainingRange, **kwargs )
 
     def addDataSource(self, dsource ):

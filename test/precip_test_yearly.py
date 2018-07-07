@@ -11,7 +11,7 @@ end_year = 2012
 nModes = 64
 nTS = 1
 smooth = 0
-freq="Y"
+freq="Y"   # Yearly average inputs.
 learning_range = CTimeRange.new( "1851-1-1", "2005-12-1" )
 
 variables = [ Variable("ts"), Variable( "zg", 80000 ), Variable( "zg", 50000 ), Variable( "zg", 25000 ) ]
@@ -23,7 +23,7 @@ nInterationsPerProc = 10
 batchSize = 100
 nEpocs = 200
 validation_fraction = 0.15
-hiddenLayers = [64]
+hiddenLayers = [100]
 activation = "relu"
 plotPrediction = True
 

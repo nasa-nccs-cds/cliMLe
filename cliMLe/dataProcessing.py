@@ -134,6 +134,10 @@ class CTimeRange:
         # type: (CDuration) -> CTimeRange
         return CTimeRange(self.startDate.inc(duration), self.endDate.inc(duration) )
 
+    def extend(self, duration ):
+        # type: (CDuration) -> CTimeRange
+        return CTimeRange(self.startDate, self.endDate.inc(duration) )
+
     def selector(self):
         # type: () -> Selector
         return Selector( time=(str(self.startDate), str(self.endDate)) )

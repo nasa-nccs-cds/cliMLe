@@ -3,7 +3,7 @@ import cdms2 as cdms
 import logging, traceback
 import numpy as np
 from typing import List, Union
-from cliMLe.dataProcessing import PreProc, CTimeRange, CDuration
+from cliMLe.dataProcessing import Analytics, CTimeRange, CDuration
 
 PC = 0
 EOF = 1
@@ -73,6 +73,7 @@ class PCDataset:
        self.normalize = kwargs.get("norm",True)
        self.nTSteps = kwargs.get( "nts", 1 )
        self.smooth = kwargs.get( "smooth", 0 )
+       self.freq = kwargs.get("freq", "M")
        self.experiments = _experiments if isinstance( _experiments, (list, tuple) ) else [ _experiments ] # type: List[Experiment]
        self.selector = self.timeRange.selector() if self.timeRange else None
        input_cols = []
@@ -101,8 +102,9 @@ class PCDataset:
     def preprocess(self, var, offset=0 ):
         end = var.shape[0] - (self.nTSteps-offset) + 1
         data = var.data[offset:end]
-        norm_data = PreProc.normalize( data ) if self.normalize else data
-        for iS in range( self.smooth ): norm_data = PreProc.lowpass( norm_data )
+        batched_data = Analytics.yearlyAve( self.timeRange.startDate, "M", data ) if self.freq == "Y" else data
+        norm_data = Analytics.normalize(batched_data) if self.normalize else batched_data
+        for iS in range( self.smooth ): norm_data = Analytics.lowpass(norm_data)
         return norm_data
 
     def getEpoch(self):

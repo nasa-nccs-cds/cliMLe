@@ -58,7 +58,9 @@ class FitResult:
         # type: (list[FitResult]) -> FitResult
         bestResult = None
         for result in results:
-            if result.isMature:
+            if isinstance(result, basestring):
+                raise Exception( "A worker raised an Exception: " + result )
+            elif result.isMature:
                 if bestResult is None or result < bestResult:
                     bestResult = result
         return bestResult
@@ -88,15 +90,11 @@ class LearningModel:
     def execute( self, nIterations=1, procIndex=-1 ):
         # type: () -> FitResult
         self.reseed()
-        try:
-            for iterIndex in range(nIterations):
-                model = self.createSequentialModel()
-                initial_weights = model.get_weights()
-                history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, callbacks=[self.tensorboard], verbose=0 )  # type: History
-                self.updateHistory( history, initial_weights, iterIndex, procIndex )
-        except Exception as err:
-            logging.error( "PROC[{0}]: {1}".format( procIndex, str(err) ) )
-            logging.error(traceback.format_exc())
+        for iterIndex in range(nIterations):
+            model = self.createSequentialModel()
+            initial_weights = model.get_weights()
+            history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, callbacks=[self.tensorboard], verbose=0 )  # type: History
+            self.updateHistory( history, initial_weights, iterIndex, procIndex )
         return self.bestFitResult
 
     def reseed(self):
@@ -196,15 +194,18 @@ class LearningModel:
 
     @classmethod
     def serial_execute(cls, lmodel_factory, nInterations, procIndex=-1, resultQueue=None):
-        # type: (object(), int, int, mp.Queue) -> FitResult
+        # type: (object(), int, int, mp.Queue) -> Union[FitResult,str]
         try:
             learningModel = lmodel_factory()  # type: LearningModel
             result = learningModel.execute( nInterations, procIndex )
             if resultQueue is not None: resultQueue.put( result )
             return result
         except Exception as err:
-            logging.error( "PROC[{0}]: {1}".format( procIndex, str(err) ) )
+            msg = "PROC[{0}]: {1}".format( procIndex, str(err) )
+            logging.error( msg )
             logging.error(traceback.format_exc())
+            if resultQueue is not None: resultQueue.put(msg)
+            return msg
 
     @classmethod
     def terminate( cls, processes ):

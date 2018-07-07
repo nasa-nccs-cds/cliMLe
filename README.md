@@ -31,3 +31,8 @@ cliMLe uses the Keras framework.
  ```
    $ pip install pillow h5py scikit-learn keras
  ```
+ 
+ * Install additional packages:
+ ```
+   $ conda install xarray
+ ```

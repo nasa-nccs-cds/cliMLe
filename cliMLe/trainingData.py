@@ -4,7 +4,7 @@ import numpy as np
 import logging, traceback
 from cdms2.selectors import Selector
 import matplotlib.pyplot as plt
-from cliMLe.dataProcessing import PreProc, CTimeRange, CDuration
+from cliMLe.dataProcessing import Analytics, CTimeRange, CDuration
 from typing import List, Union, Dict, Any
 from cliMLe.pcProject import PCDataset
 
@@ -59,8 +59,8 @@ class ProjectDataSource(DataSource):
             timeseries =  variable.data  # type: np.ndarray
             if( length == -1 ): length = timeseries.shape[0] - offset
             offset_data = timeseries[offset:offset+length]
-            norm_data = PreProc.normalize( offset_data ) if normalize else offset_data
-            for iS in range(smooth): norm_data = PreProc.lowpass( norm_data )
+            norm_data = Analytics.normalize(offset_data) if normalize else offset_data
+            for iS in range(smooth): norm_data = Analytics.lowpass(norm_data)
             norm_timeseries.append( (varName, norm_data ) )
         dset.close()
         return TimeseriesData( dates, norm_timeseries )
@@ -72,6 +72,9 @@ class ProjectDataSource(DataSource):
 
 
 class IITMDataSource(DataSource):
+
+    # Types:   MONTHLY ANNUAL JF MAM JJAS OND
+    # Names:   AI EPI NCI NEI NMI SPI WPI
 
     def __init__(self, name, _type):
         # type: ( str, str ) -> None
@@ -93,12 +96,17 @@ class IITMDataSource(DataSource):
         else:
             raise Exception( "Unrecognized Data source type: " + self.type )
 
+    def freq(self):
+        if self.type == "monthly": return "M"
+        else: return "Y"
+
     def getTimeseries(self, timeRange, **kwargs):
-        # type: ( Union[bool,int] ) -> TimeseriesData
+        # type: ( CTimeRange ) -> TimeseriesData
         dset = open(self.dataFile,"r")
         lines = dset.readlines()
         normalize = kwargs.get("norm", True)
         smooth = kwargs.get("smooth", 0)
+        decycle = kwargs.get( "decycle", False )
         timeseries = []
         dates = []
         logging.info("TrainingData: name = {0}, time range = {1}".format(str(self.name), str(timeRange)))
@@ -121,8 +129,9 @@ class IITMDataSource(DataSource):
                         timeseries.append( value )
                         dates.append( date )
         tsarray = np.array( timeseries )
-        norm_data = PreProc.normalize(tsarray) if normalize else tsarray
-        for iS in range(smooth): norm_data = PreProc.lowpass(norm_data)
+        decycled_array = Analytics.decycle( timeRange.startDate, self.freq(), tsarray ) if decycle else tsarray
+        norm_data = Analytics.normalize(decycled_array) if normalize else decycled_array
+        for iS in range(smooth): norm_data = Analytics.lowpass(norm_data)
         return TimeseriesData( dates, [ ( self.type, norm_data ) ] )
 
     def isYear( self, s ):
@@ -139,6 +148,7 @@ class TrainingDataset:
         # type: ( list[DataSource], CDuration ) -> None
         self.dataSources = sources
         self.smooth = kwargs.get("smooth",0)
+        self.decycle = kwargs.get("decycle", False)
         self.trainingRange = kwargs.get( "trainingRange", None ) # type: CTimeRange
         self._timeseries = []
 
@@ -148,7 +158,7 @@ class TrainingDataset:
         offset = inputDataset.nTSteps - 1 if inputDataset is not None else 0
         smooth = inputDataset.smooth if inputDataset is not None else 0
         trainingRange = inputDataset.timeRange.shift(predictionLag.inc(offset))
-        return cls( sources, predictionLag, smooth=smooth, trainingRange=trainingRange )
+        return cls( sources, predictionLag, smooth=smooth, trainingRange=trainingRange, **kwargs )
 
     def addDataSource(self, dsource ):
         # type: (DataSource) -> None
@@ -157,7 +167,7 @@ class TrainingDataset:
     def getTimeseries(self):
         # type: () -> ( list[TimeseriesData] )
         if len( self._timeseries ) == 0:
-            self._timeseries = [ dsource.getTimeseries( self.trainingRange, smooth=self.smooth ) for dsource in self.dataSources]  # type: List[TimeseriesData]
+            self._timeseries = [ dsource.getTimeseries( self.trainingRange, smooth=self.smooth, decycle=self.decycle ) for dsource in self.dataSources]  # type: List[TimeseriesData]
         return self._timeseries
 
     def getTimeseriesData(self):

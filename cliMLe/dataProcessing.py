@@ -1,9 +1,12 @@
 import os, sys, math, datetime
 from cdms2.selectors import Selector
 import numpy as np
+import pandas as pd
+import xarray as xr
 
-class PreProc:
+class Analytics:
     smoothing_kernel = np.array([.13, .23, .28, .23, .13])
+    months = "jfmamjjasonjfmamjjason"
 
     @staticmethod
     def normalize( data, axis=0 ):
@@ -16,10 +19,45 @@ class PreProc:
         # type: (np.ndarray) -> np.ndarray
         return np.convolve( data, cls.smoothing_kernel, "same")
 
+    @classmethod
+    def decycle( cls, start_date, freq, data ):
+        # type: (CDate,str,np.ndarray) -> np.ndarray
+        if len(data.shape) == 1: data = data.reshape( [ data.shape[0], 1 ] )
+        times = pd.date_range(start=str(start_date), periods=data.shape[0], freq=freq, name='time')     # type: pd.DatetimeIndex
+        ds = xr.Dataset({'data': ( ('time', 'series'), data) },   {'time': times } )                    # type: xr.Dataset
+        climatology = ds.groupby('time.month').mean('time')                                             # type: xr.Dataset
+        anomalies = ds.groupby('time.month') - climatology                                              # type: xr.Dataset
+        return anomalies["data"].data
+
+    @classmethod
+    def yearlyAve( cls, start_date, freq, data ):
+        # type: (CDate,str,np.ndarray) -> np.ndarray
+        if len(data.shape) == 1: data = data.reshape( [ data.shape[0], 1 ] )
+        times = pd.date_range(start=str(start_date), periods=data.shape[0], freq=freq, name='time')     # type: pd.DatetimeIndex
+        ds = xr.Dataset({'data': ( ('time', 'series'), data) },   {'time': times } )                    # type: xr.Dataset
+        yearly_ave = ds.groupby('time.year').mean('time')                                               # type: xr.Dataset
+        return yearly_ave["data"].data
+
+
+    @classmethod
+    def monthSubsetIndices( cls, subset ):
+        start_index = cls.months.index( subset.lower() ) + 1
+        return range( start_index, start_index + len(subset) )
+
+    # @classmethod
+    # def monthlySubset( cls, start_date, subset, data ):
+    #     # type: (CDate,str,np.ndarray) -> np.ndarray
+    #     subset_indices = cls.monthSubsetIndices( subset )
+    #     if len(data.shape) == 1: data = data.reshape( [ data.shape[0], 1 ] )
+    #     times = pd.date_range(start=str(start_date), periods=data.shape[0], freq=freq, name='time')     # type: pd.DatetimeIndex
+    #     ds = xr.Dataset({'data': ( ('time', 'series'), data) },   {'time': times } )                    # type: xr.Dataset
+    #     yearly_ave = ds.groupby('time.year').mean('time')                                               # type: xr.Dataset
+    #     return yearly_ave["data"].data
+
 class CDuration:
 
-    MONTH = 0
-    YEAR = 1
+    MONTH = "M"
+    YEAR = "Y"
 
     def __init__(self, _length, _unit):
         self.length = _length
@@ -112,3 +150,6 @@ class CTimeRange:
     def inDateRange( self, date ):
         # type: (datetime.date) -> bool
         return date >= self.dateRange[0] and date <= self.dateRange[1]
+
+if __name__ == "__main__":
+    print str( Analytics.monthSubsetIndices( "JFMA") )

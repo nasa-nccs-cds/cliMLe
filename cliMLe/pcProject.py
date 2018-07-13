@@ -74,12 +74,18 @@ class PCDataset:
        self.nTSteps = kwargs.get( "nts", 1 )
        self.smooth = kwargs.get( "smooth", 0 )
        self.freq = kwargs.get("freq", "M")
+       self.filter = kwargs.get("filter", "")
        self.experiments = _experiments if isinstance( _experiments, (list, tuple) ) else [ _experiments ] # type: List[Experiment]
        self.selector = self.timeRange.selector() if self.timeRange else None
        input_cols = []
-       for iTS in range( self.nTSteps ):
-           input_cols.extend( [self.preprocess(var,iTS) for var in self.getVariables()] )
-       self.data = np.column_stack( input_cols )
+       if self.filter :
+           input_cols.extend( [self.preprocess(var) for var in self.getVariables()] )
+           self.data = np.column_stack( input_cols )
+           self.nTSteps = 1
+       else:
+           for iTS in range( self.nTSteps ):
+               input_cols.extend( [self.preprocess(var,iTS) for var in self.getVariables()] )
+           self.data = np.column_stack( input_cols )
 
     def getVariables(self):
         # type: () -> list[cdms.tvariable.TransientVariable]
@@ -90,10 +96,11 @@ class PCDataset:
 
     def getInputDimension(self):
         # type: () -> int
-        size = 0
-        for experiment in self.experiments:
-            size += experiment.nModes
-        return size * self.nTSteps
+        return self.data.shape[1]
+#        size = 0
+#        for experiment in self.experiments:
+#            size += experiment.nModes
+#        return size * self.nTSteps
 
     def getVariableIds(self):
         # type: () -> str
@@ -101,11 +108,25 @@ class PCDataset:
 
     def preprocess(self, var, offset=0 ):
         end = var.shape[0] - (self.nTSteps-offset) + 1
-        data = var.data[offset:end]
-        batched_data = Analytics.yearlyAve( self.timeRange.startDate, "M", data ) if self.freq == "Y" else data
-        norm_data = Analytics.normalize(batched_data) if self.normalize else batched_data
+        raw_data = var.data[offset:end]
+        norm_data = Analytics.normalize(raw_data) if self.normalize else raw_data
         for iS in range( self.smooth ): norm_data = Analytics.lowpass(norm_data)
-        return norm_data
+        if self.filter:
+            slices = []
+            dates = var.getTime().asComponentTime()
+            months = [ date.month for date in dates ]
+            month_filter_start_index = "xjfmamjjasondjfmamjjasond".index( self.filter.lower() )
+            filter_len = len(self.filter)
+            for mIndex in range(len(months)):
+                if months[mIndex] == month_filter_start_index:
+                    slice = norm_data[ mIndex: mIndex + filter_len ]
+                    slices.append( slice )
+            batched_data = np.row_stack( slices )
+            if self.freq == "M": batched_data = batched_data.flatten()
+        else:
+            batched_data = Analytics.yearlyAve( self.timeRange.startDate, "M", norm_data ) if self.freq == "Y" else norm_data
+
+        return batched_data
 
     def getEpoch(self):
         # type: () -> np.ndarray

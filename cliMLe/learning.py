@@ -77,6 +77,7 @@ class LearningModel:
         self.hidden = kwargs.get(  'hidden', [16] )
         self.shuffle = kwargs.get('shuffle', False )
         self.weights = kwargs.get(  'weights', None )
+        self.max_loss = kwargs.get(  'max_loss', sys.float_info.max )
         self.activation = kwargs.get(  'activation', 'relu' )
         self.timestamp = datetime.now().strftime("%m-%d-%y.%H:%M:%S")
         self.projectName = self.inputs.experiments[0].project.name
@@ -158,12 +159,19 @@ class LearningModel:
     def updateHistory( self, history, initial_weights, iterIndex, procIndex ):
         # type: (History, list[np.ndarray], int, int) -> History
         val_loss = history.history['val_loss']
-        training_loss = history.history['loss'][-1]
-        current_min_loss_val, current_min_loss_index = min( (val_loss[i],i) for i in xrange(len(val_loss)) )
-        if not self.bestFitResult or (current_min_loss_val < self.bestFitResult.val_loss ):
-            self.bestFitResult = FitResult.new( history, initial_weights, training_loss, current_min_loss_val, current_min_loss_index )
-        if procIndex < 0:   print "Executed iteration {0}, current loss = {1}  (NE={2}), best loss = {3} (NE={4})".format(iterIndex, current_min_loss_val, current_min_loss_index, self.bestFitResult.val_loss, self.bestFitResult.nEpocs )
-        else:               logging.info( "PROC[{0}]: Iteration {1}, val_loss = {2}, val_loss index = {3}, min val_loss = {4}".format( procIndex, iterIndex, current_min_loss_val, current_min_loss_index, self.bestFitResult.val_loss ) )
+        training_loss = history.history['loss']
+        current_min_loss_val = sys.float_info.max
+        current_min_loss_index = -1
+        for i in xrange( len(val_loss) ):
+            vloss, tloss = val_loss[i], training_loss[i]
+            if tloss < self.max_loss and vloss < current_min_loss_val:
+               current_min_loss_val =  vloss
+               current_min_loss_index = i
+        if current_min_loss_index > 0:
+            if not self.bestFitResult or ( current_min_loss_val < self.bestFitResult.val_loss ):
+                self.bestFitResult = FitResult.new( history, initial_weights, training_loss[-1], current_min_loss_val, current_min_loss_index )
+            if procIndex < 0:   print "Executed iteration {0}, current loss = {1}  (NE={2}), best loss = {3} (NE={4})".format(iterIndex, current_min_loss_val, current_min_loss_index, self.bestFitResult.val_loss, self.bestFitResult.nEpocs )
+            else:               logging.info( "PROC[{0}]: Iteration {1}, val_loss = {2}, val_loss index = {3}, min val_loss = {4}".format( procIndex, iterIndex, current_min_loss_val, current_min_loss_index, self.bestFitResult.val_loss ) )
         return history
 
     def plotPrediction( self, fitResult, title, **kwargs ):
@@ -181,13 +189,13 @@ class LearningModel:
         if plotFinal:
             model2 = self.getFinalModel(fitResult)
             prediction2 = model2.predict( self.inputData )
-            plt.plot_date(self.dates, prediction2, "-", label="prediction: final" )
+            plt.plot_date(self.dates, prediction2, ":", label="prediction: final" )
 
-        plt.plot_date(self.dates, self.outputData, "-", label="training data" )
+        plt.plot_date(self.dates, self.outputData, "--", label="training data" )
 
         if refData is not None:
             for key, value in refData:
-                plt.plot_date(self.dates, value, "-", label= key + " ref (lag 0)" )
+                plt.plot_date(self.dates, value, ":", label= key + " ref (lag 0)" )
 
         plt.legend()
         plt.show()

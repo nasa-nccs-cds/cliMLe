@@ -106,6 +106,15 @@ class PCDataset:
         # type: () -> str
         return "[" + ",".join( exp.variable.id for exp in self.experiments ) +"]"
 
+    def getFilterIndices(self):
+        try:
+            start_index = int(self.filter)
+            return (start_index, 1)
+        except:
+            start_index = "xjfmamjjasondjfmamjjasond".index(self.filter.lower())
+            if start_index < 0: raise Exception("Unrecognizable filter value: " + self.filter )
+            return ( start_index, len(self.filter) )
+
     def preprocess(self, var, offset=0 ):
         end = var.shape[0] - (self.nTSteps-offset) + 1
         raw_data = var.data[offset:end]
@@ -115,8 +124,7 @@ class PCDataset:
             slices = []
             dates = var.getTime().asComponentTime()
             months = [ date.month for date in dates ]
-            month_filter_start_index = "xjfmamjjasondjfmamjjasond".index( self.filter.lower() )
-            filter_len = len(self.filter)
+            (month_filter_start_index, filter_len) = self.getFilterIndices()
             for mIndex in range(len(months)):
                 if months[mIndex] == month_filter_start_index:
                     slice = norm_data[ mIndex: mIndex + filter_len ]

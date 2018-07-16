@@ -128,7 +128,7 @@ class LearningModel:
 
     def getFittedModel( self, fitResult ):
         # type: (FitResult) -> Model
-        model = self.createSequentialModel()
+        model = self.createSequentialModel()  # type: Sequential
         model.set_weights( fitResult.initial_weights )
         model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=fitResult.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, verbose=0 )  # type: History
         return model
@@ -185,29 +185,17 @@ class LearningModel:
 
     def plotPrediction( self, fitResult, title, **kwargs ):
         # type: (FitResult, str) -> None
-        plotFinal = kwargs.get("plotFinal", False)
-        refData = kwargs.get("ref", None )  # type: dict[str,np.ndarray]
-        plt.title(title)
         print "Plotting result: " + title
         print " ---> NEpocs = {0}, loss = {1}, loss history = {2}".format(fitResult.nEpocs, fitResult.val_loss, str(fitResult.val_loss_history))
-
         model1 = self.getFittedModel(fitResult)
-        prediction1 = model1.predict( self.inputData )
-        plt.plot_date(self.dates, prediction1, "-", label="prediction: fitted" )
-
-        if plotFinal:
-            model2 = self.getFinalModel(fitResult)
-            prediction2 = model2.predict( self.inputData )
-            plt.plot_date(self.dates, prediction2, ":", label="prediction: final" )
-
-        plt.plot_date(self.dates, self.outputData, "--", label="training data" )
-
-        if refData is not None:
-            for key, value in refData:
-                plt.plot_date(self.dates, value, ":", label= key + " ref (lag 0)" )
-
-        plt.legend()
-        plt.show()
+        prediction1 = model1.predict( self.inputData )  # type: np.ndarray
+        targetNames = self.outputs.targetNames()
+        for iPlot in range(prediction1.shape[1]):
+            plt.title( targetNames[iPlot] + ": " + title )
+            plt.plot_date(self.dates, prediction1[:,iPlot], "-", label="prediction: fitted" )
+            plt.plot_date(self.dates, self.outputData[:,iPlot], "--", label="training data" )
+            plt.legend()
+            plt.show()
 
     def plotPerformance( self, fitResult, title, **kwargs ):
         # type: (FitResult, str) -> None

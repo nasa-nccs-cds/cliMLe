@@ -20,9 +20,9 @@ project = Project(outDir,projectName)
 pcDataset = PCDataset( [ Experiment(project,start_year,end_year,64,variable) for variable in variables ], nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = learning_range )
 
 prediction_lag = CDuration.years(1)
-nInterationsPerProc = 15
-batchSize = 200
-maxTrainingLoss = 0.8
+nInterationsPerProc = 10
+batchSize = 150
+maxTrainingLoss = 0.5
 nEpocs = 400
 learnRate = 0.005
 momentum=0.0
@@ -33,7 +33,7 @@ hiddenLayers = [100]
 activation = "relu"
 plotPrediction = True
 
-tds = [ IITMDataSource( domain, "JJAS" ) for domain in [ "AI", "EPI", "NCI", "NEI", "NMI", "NWI", "SPI", "WPI"] ]
+tds = [ IITMDataSource( domain, "JJAS" ) for domain in [ "AI" ] ] # [ "AI", "EPI", "NCI", "NEI", "NMI", "NWI", "SPI", "WPI"]
 trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag, decycle=True )
 
 #ref_time_range = ( "1980-1-1", "2014-12-1" )
@@ -46,7 +46,7 @@ result = LearningModel.parallel_execute( learning_model_factory, nInterationsPer
 print "Got Best result, valuation loss = " + str( result.val_loss ) + " training loss = " + str( result.train_loss )
 
 if plotPrediction:
-    plot_title = "Training data with Prediction ({0}->IITM-AI, lag {1}) {2}-{3} (loss: {4}, Epochs: {5})".format(pcDataset.getVariableIds(),prediction_lag,start_year,end_year,result.val_loss,result.nEpocs)
+    plot_title = "Training data with Prediction ({0}->IITM, lag {1}) {2}-{3} (loss: {4}, Epochs: {5})".format(pcDataset.getVariableIds(),prediction_lag,start_year,end_year,result.val_loss,result.nEpocs)
     learningModel = learning_model_factory()
-    learningModel.plotPrediction( result, plot_title )
+    learningModel.plotPrediction( result, "Monsoon Prediction with IITM" )
     learningModel.plotPerformance( result, plot_title )

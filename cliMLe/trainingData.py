@@ -161,6 +161,9 @@ class TrainingDataset:
  #       trainingRange1 = trainingRange.extend( CDuration.months( offset ) )
         return cls( sources, predictionLag, smooth=smooth, trainingRange=trainingRange, **kwargs )
 
+    def targetNames(self):
+        return [ source.name for source in self.dataSources ]
+
     def addDataSource(self, dsource ):
         # type: (DataSource) -> None
         self.dataSources.append( dsource )

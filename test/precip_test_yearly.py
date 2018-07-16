@@ -22,19 +22,19 @@ pcDataset = PCDataset( [ Experiment(project,start_year,end_year,64,variable) for
 prediction_lag = CDuration.years(1)
 nInterationsPerProc = 15
 batchSize = 200
-maxTrainingLoss = 0.6
+maxTrainingLoss = 0.8
 nEpocs = 400
 learnRate = 0.005
 momentum=0.0
 decay=0.0
 nesterov=False
 validation_fraction = 0.2
-hiddenLayers = [64]
+hiddenLayers = [100]
 activation = "relu"
 plotPrediction = True
 
-td = IITMDataSource( "AI", "JJAS" )
-trainingDataset = TrainingDataset.new( [td], pcDataset, prediction_lag, decycle=True )
+tds = [ IITMDataSource( domain, "JJAS" ) for domain in [ "AI", "EPI", "NCI", "NEI", "NMI", "NWI", "SPI", "WPI"] ]
+trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag, decycle=True )
 
 #ref_time_range = ( "1980-1-1", "2014-12-1" )
 #ref_ts = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], ref_time_range )

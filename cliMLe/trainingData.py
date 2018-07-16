@@ -123,9 +123,9 @@ class IITMDataSource(DataSource):
                             dates.append( date )
                 else:
                     colIndex, iMonth = self.getTypeIndices()
-                    value = float( line_elems[ colIndex ] )
                     date = datetime.date(iYear, iMonth, 15)
                     if not timeRange or timeRange.inDateRange(date):
+                        value = float( line_elems[ colIndex ] )
                         timeseries.append( value )
                         dates.append( date )
         tsarray = np.array( timeseries )

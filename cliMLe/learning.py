@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import multiprocessing as mp
 import random, sys
 import numpy as np
+from keras.optimizers import SGD
 import logging, traceback
 outDir = os.path.join( os.path.expanduser("~"), "results" )
 LOG_FILE = os.path.join( outDir, 'logs', 'cliMLe.log' )
@@ -81,6 +82,10 @@ class LearningModel:
         self.hidden = kwargs.get(  'hidden', [16] )
         self.shuffle = kwargs.get('shuffle', False )
         self.weights = kwargs.get(  'weights', None )
+        self.lr = kwargs.get(  'lrate', 0.01 )
+        self.momentum = kwargs.get(  'momentum', 0.0 )
+        self.decay = kwargs.get(  'decay', 0.0 )
+        self.nesterov = kwargs.get(  'nesterov', False )
         self.max_loss = kwargs.get(  'max_loss', sys.float_info.max )
         self.activation = kwargs.get(  'activation', 'relu' )
         self.timestamp = datetime.now().strftime("%m-%d-%y.%H:%M:%S")
@@ -155,8 +160,8 @@ class LearningModel:
                 model.add(Dense(units=self.hidden[hIndex], activation=self.activation))
         output_layer = Dense(units=nOutputs) if nHidden else Dense(units=nOutputs, input_dim=nInputs)
         model.add( output_layer )
-
-        model.compile(loss='mse', optimizer='sgd', metrics=['accuracy'])
+        sgd = SGD( lr=self.lr, decay=self.decay, momentum=self.momentum, nesterov=self.nesterov )
+        model.compile(loss='mse', optimizer=sgd, metrics=['accuracy'])
         if self.weights is not None: model.set_weights(self.weights)
         return model
 

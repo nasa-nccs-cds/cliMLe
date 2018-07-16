@@ -21,10 +21,14 @@ pcDataset = PCDataset( [ Experiment(project,start_year,end_year,64,variable) for
 
 prediction_lag = CDuration.years(1)
 nInterationsPerProc = 15
-batchSize = 100
-maxTrainingLoss = 0.2
-nEpocs = 200
-validation_fraction = 0.15
+batchSize = 200
+maxTrainingLoss = 0.6
+nEpocs = 400
+learnRate = 0.005
+momentum=0.0
+decay=0.0
+nesterov=False
+validation_fraction = 0.2
 hiddenLayers = [64]
 activation = "relu"
 plotPrediction = True
@@ -36,7 +40,7 @@ trainingDataset = TrainingDataset.new( [td], pcDataset, prediction_lag, decycle=
 #ref_ts = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], ref_time_range )
 
 def learning_model_factory( weights = None ):
-    return LearningModel( pcDataset, trainingDataset, batch=batchSize, epocs=nEpocs, vf=validation_fraction, hidden=hiddenLayers, max_loss=maxTrainingLoss, activation=activation, weights=weights )
+    return LearningModel( pcDataset, trainingDataset, batch=batchSize, lrate=learnRate, momentum=momentum, decay=decay, nesterov=nesterov, epocs=nEpocs, vf=validation_fraction, hidden=hiddenLayers, max_loss=maxTrainingLoss, activation=activation, weights=weights )
 
 result = LearningModel.parallel_execute( learning_model_factory, nInterationsPerProc )
 print "Got Best result, valuation loss = " + str( result.val_loss ) + " training loss = " + str( result.train_loss )

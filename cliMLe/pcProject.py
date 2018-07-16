@@ -56,13 +56,14 @@ class Experiment:
         dataset = self.getDataset( rType )
         return dataset(varName,selector) if selector else dataset(varName)
 
-    def getVariables( self, rType, selector = None ):
+    def getVariables( self, rType, selector = None, nModes = -1 ):
         # type: (int) -> list[cdms.tvariable.TransientVariable]
         dataset = self.getDataset( rType )
         varnames = [ vname for vname in dataset.listvariables() if not vname.endswith("_bnds") ]
         varnames.sort()
+        nVars = len(varnames) if nModes <0 else min( len(varnames), nModes )
         logging.info( "Get Input PC timeseries, vars: {0}, range: {1}".format( str(varnames), str(selector) ) )
-        return [ dataset(varName,selector) for varName in varnames ] if selector else [ dataset(varName) for varName in varnames ]
+        return [ dataset(varnames[iVar],selector) for iVar in range(nVars) ] if selector else [ dataset( varnames[iVar] ) for iVar in range(nVars) ]
 
 
 class PCDataset:
@@ -72,6 +73,7 @@ class PCDataset:
        self.timeRange = kwargs.get( "timeRange", None ) # type: CTimeRange
        self.normalize = kwargs.get("norm",True)
        self.nTSteps = kwargs.get( "nts", 1 )
+       self.nModes = kwargs.get( "nmodes", -1 )
        self.smooth = kwargs.get( "smooth", 0 )
        self.freq = kwargs.get("freq", "M")
        self.filter = kwargs.get("filter", "")
@@ -91,7 +93,7 @@ class PCDataset:
         # type: () -> list[cdms.tvariable.TransientVariable]
         variable_list = []
         for experiment in self.experiments:
-            variable_list.extend( experiment.getVariables( PC, self.selector ) )
+            variable_list.extend( experiment.getVariables( PC, self.selector, self.nModes ) )
         return variable_list
 
     def getInputDimension(self):
@@ -117,7 +119,7 @@ class PCDataset:
 
     def preprocess(self, var, offset=0 ):
         end = var.shape[0] - (self.nTSteps-offset) + 1
-        raw_data = var.data[offset:end]
+        raw_data = var.data[ offset:end ]
         norm_data = Analytics.normalize(raw_data) if self.normalize else raw_data
         for iS in range( self.smooth ): norm_data = Analytics.lowpass(norm_data)
         if self.filter:

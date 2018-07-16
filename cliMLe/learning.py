@@ -25,10 +25,11 @@ class FitResult:
     @staticmethod
     def new( history, initial_weights, training_loss, val_loss,  nEpocs):
         # type: (History, list[np.ndarray], float, int) -> FitResult
-        return FitResult( history.history['val_loss'], initial_weights, history.model.get_weights(),  training_loss, val_loss, nEpocs )
+        return FitResult( history.history['val_loss'], history.history['loss'], initial_weights, history.model.get_weights(),  training_loss, val_loss, nEpocs )
 
-    def __init__( self, _val_loss_history, _initial_weights, _final_weights, _training_loss,  _val_loss, _nEpocs ):
+    def __init__( self, _val_loss_history, _train_loss_history, _initial_weights, _final_weights, _training_loss,  _val_loss, _nEpocs ):
         self.val_loss_history = _val_loss_history
+        self.train_loss_history = _train_loss_history
         self.initial_weights = _initial_weights
         self.final_weights = _final_weights
         self.val_loss = _val_loss
@@ -37,6 +38,9 @@ class FitResult:
 
     def valLossHistory(self):
         return self.val_loss_history
+
+    def lossHistory(self):
+        return self.train_loss_history
 
     def isMature(self):
         return self.val_loss < self.train_loss
@@ -197,6 +201,18 @@ class LearningModel:
             for key, value in refData:
                 plt.plot_date(self.dates, value, ":", label= key + " ref (lag 0)" )
 
+        plt.legend()
+        plt.show()
+
+    def plotPerformance( self, fitResult, title, **kwargs ):
+        # type: (FitResult, str) -> None
+        valLossHistory = fitResult.valLossHistory()
+        trainLossHistory = fitResult.lossHistory()
+        plt.title(title)
+        print "Plotting result: " + title
+        x = range( len(valLossHistory) )
+        plt.plot( x, valLossHistory, "--", label="Validation Loss" )
+        plt.plot( x, trainLossHistory, "--", label="Training Loss" )
         plt.legend()
         plt.show()
 

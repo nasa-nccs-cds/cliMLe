@@ -3,6 +3,7 @@ from keras.layers import Dense, Activation
 from typing import Optional, Any
 
 from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
+from cliMLe.inputData import InputDataset
 from cliMLe.trainingData import *
 import time, keras
 from datetime import datetime
@@ -65,7 +66,7 @@ class FitResult:
         for result in results:
             if isinstance(result, basestring):
                 raise Exception( "A worker raised an Exception: " + result )
-            elif result.isMature:
+            elif result and result.isMature:
                 if bestResult is None or result < bestResult:
                     bestResult = result
         return bestResult
@@ -73,6 +74,7 @@ class FitResult:
 class LearningModel:
 
     def __init__( self, inputDataset, trainingDataset,  **kwargs ):
+        # type: (InputDataset, TrainingDataset) -> None
         self.inputs = inputDataset                  # type: PCDataset
         self.outputs = trainingDataset              # type: TrainingDataset
         self.batchSize = kwargs.get( 'batch', 50 )
@@ -89,7 +91,7 @@ class LearningModel:
         self.max_loss = kwargs.get( 'max_loss', sys.float_info.max )
         self.activation = kwargs.get( 'activation', 'relu' )
         self.timestamp = datetime.now().strftime("%m-%d-%y.%H:%M:%S")
-        self.projectName = self.inputs.experiments[0].project.name
+        self.projectName = self.inputs.getName()
         self.logDir = os.path.expanduser("~/results/logs/{}".format( self.projectName + "_" + self.timestamp ) )
         self.inputData = self.inputs.getEpoch()
         self.dates, self.outputData = self.outputs.getEpoch()

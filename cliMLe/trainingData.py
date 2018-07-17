@@ -107,6 +107,7 @@ class IITMDataSource(DataSource):
         normalize = kwargs.get("norm", True)
         smooth = kwargs.get("smooth", 0)
         decycle = kwargs.get( "decycle", False )
+
         timeseries = []
         dates = []
         logging.info("TrainingData: name = {0}, time range = {1}".format(str(self.name), str(timeRange)))
@@ -129,9 +130,11 @@ class IITMDataSource(DataSource):
                         timeseries.append( value )
                         dates.append( date )
         tsarray = np.array( timeseries )
-        decycled_array = Analytics.decycle( timeRange.startDate, self.freq(), tsarray ) if decycle else tsarray
+
+        decycled_array = Analytics.decycle( dates, tsarray ) if decycle else Analytics.center( tsarray )
         norm_data = Analytics.normalize(decycled_array) if normalize else decycled_array
         for iS in range(smooth): norm_data = Analytics.lowpass(norm_data)
+
         return TimeseriesData( dates, [ ( self.type, norm_data ) ] )
 
     def isYear( self, s ):

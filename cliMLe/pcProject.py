@@ -4,6 +4,7 @@ import logging, traceback
 import numpy as np
 from typing import List, Union
 from cliMLe.dataProcessing import Analytics, CTimeRange, CDuration
+from cliMLe.inputData import InputDataSource
 
 PC = 0
 EOF = 1
@@ -66,17 +67,12 @@ class Experiment:
         return [ dataset(varnames[iVar],selector) for iVar in range(nVars) ] if selector else [ dataset( varnames[iVar] ) for iVar in range(nVars) ]
 
 
-class PCDataset:
+class PCDataset(InputDataSource):
 
-    def __init__(self, _experiments, **kwargs ):
-       # type: ( list[Experiment] ) -> None
-       self.timeRange = kwargs.get( "timeRange", None ) # type: CTimeRange
-       self.normalize = kwargs.get("norm",True)
-       self.nTSteps = kwargs.get( "nts", 1 )
+    def __init__(self, name, _experiments, **kwargs ):
+       # type: ( str, list[Experiment] ) -> None
+       super(PCDataset, self).__init__(name, **kwargs)
        self.nModes = kwargs.get( "nmodes", -1 )
-       self.smooth = kwargs.get( "smooth", 0 )
-       self.freq = kwargs.get("freq", "M")
-       self.filter = kwargs.get("filter", "")
        self.experiments = _experiments if isinstance( _experiments, (list, tuple) ) else [ _experiments ] # type: List[Experiment]
        self.selector = self.timeRange.selector() if self.timeRange else None
        input_cols = []
@@ -108,31 +104,34 @@ class PCDataset:
         # type: () -> str
         return "[" + ",".join( exp.variable.id for exp in self.experiments ) +"]"
 
-    def getFilterIndices(self):
-        try:
-            start_index = int(self.filter)
-            return (start_index, 1)
-        except:
-            start_index = "xjfmamjjasondjfmamjjasond".index(self.filter.lower())
-            if start_index < 0: raise Exception("Unrecognizable filter value: " + self.filter )
-            return ( start_index, len(self.filter) )
-
     def preprocess(self, var, offset=0 ):
+        debug = False
         end = var.shape[0] - (self.nTSteps-offset) + 1
         raw_data = var.data[ offset:end ]
         norm_data = Analytics.normalize(raw_data) if self.normalize else raw_data
         for iS in range( self.smooth ): norm_data = Analytics.lowpass(norm_data)
+
         if self.filter:
             slices = []
             dates = var.getTime().asComponentTime()
+            if debug:
+                logging.info( "-------------- RAW DATA ------------------ " )
+                for index in range( len(dates)):
+                    logging.info( str(dates[index]) + ": " + str( norm_data[index] ) )
+
             months = [ date.month for date in dates ]
-            (month_filter_start_index, filter_len) = self.getFilterIndices()
+            (month_filter_start_index, filter_len) = Analytics.getMonthFilterIndices(self.filter)
             for mIndex in range(len(months)):
                 if months[mIndex] == month_filter_start_index:
                     slice = norm_data[ mIndex: mIndex + filter_len ]
                     slices.append( slice )
             batched_data = np.row_stack( slices )
             if self.freq == "M": batched_data = batched_data.flatten()
+
+            if debug:
+                logging.info( "-------------- FILTERED DATA ------------------ " )
+                for index in range( batched_data.shape[0]):
+                    logging.info( str( batched_data[index] ) )
         else:
             batched_data = Analytics.yearlyAve( self.timeRange.startDate, "M", norm_data ) if self.freq == "Y" else norm_data
 

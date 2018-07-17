@@ -14,16 +14,32 @@ class Analytics:
         std = np.std( data, axis )
         return data / std
 
+    @staticmethod
+    def center( data, axis=0 ):
+        # type: (np.ndarray) -> np.ndarray
+        mean = np.average( data, axis )
+        return data - mean
+
+    @staticmethod
+    def getMonthFilterIndices(filter):
+        try:
+            start_index = int(filter)
+            return (start_index, 1)
+        except:
+            start_index = "xjfmamjjasondjfmamjjasond".index(filter.lower())
+            if start_index < 0: raise Exception("Unrecognizable filter value: " + filter )
+            return ( start_index, len(filter) )
+
     @classmethod
     def lowpass( cls, data ):
         # type: (np.ndarray) -> np.ndarray
         return np.convolve( data, cls.smoothing_kernel, "same")
 
     @classmethod
-    def decycle( cls, start_date, freq, data ):
-        # type: (CDate,str,np.ndarray) -> np.ndarray
+    def decycle( cls, dates, data ):
+        # type: (list[datetime.date],np.ndarray) -> np.ndarray
         if len(data.shape) == 1: data = data.reshape( [ data.shape[0], 1 ] )
-        times = pd.date_range(start=str(start_date), periods=data.shape[0], freq=freq, name='time')     # type: pd.DatetimeIndex
+        times = pd.DatetimeIndex( data=dates, name="time" )                                             # type: pd.DatetimeIndex
         ds = xr.Dataset({'data': ( ('time', 'series'), data) },   {'time': times } )                    # type: xr.Dataset
         climatology = ds.groupby('time.month').mean('time')                                             # type: xr.Dataset
         anomalies = ds.groupby('time.month') - climatology                                              # type: xr.Dataset

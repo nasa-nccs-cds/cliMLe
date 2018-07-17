@@ -1,5 +1,6 @@
 import os, sys, math, datetime
 from cdms2.selectors import Selector
+from cliMLe.svd import Eof
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -44,6 +45,13 @@ class Analytics:
         climatology = ds.groupby('time.month').mean('time')                                             # type: xr.Dataset
         anomalies = ds.groupby('time.month') - climatology                                              # type: xr.Dataset
         return anomalies["data"].data
+
+    @classmethod
+    def orthoModes( cls, data, nModes ):
+        # type: (np.ndarray, int) -> np.ndarray
+        eof = Eof( data, None, False, False )
+        result = eof.eofs( 0, nModes )  # type: np.ndarray
+        return result.transpose()
 
     @classmethod
     def yearlyAve( cls, start_date, freq, data ):

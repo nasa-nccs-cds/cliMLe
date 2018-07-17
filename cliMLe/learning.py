@@ -83,6 +83,7 @@ class LearningModel:
         self.timeRange = kwargs.get(  'timeRange', None )
         self.hidden = kwargs.get( 'hidden', [16] )
         self.shuffle = kwargs.get('shuffle', False )
+        self.orthoWts = kwargs.get('orthoWts', False )
         self.weights = kwargs.get( 'weights', None )
         self.lr = kwargs.get( 'lrate', 0.01 )
         self.momentum = kwargs.get( 'momentum', 0.0 )
@@ -98,6 +99,7 @@ class LearningModel:
         self.tensorboard = TensorBoard( log_dir=self.logDir, histogram_freq=0, write_graph=True )
         self.bestFitResult = None # type: FitResult
         self.weights_template = self.createSequentialModel().get_weights()
+        if self.orthoWts: assert self.hidden[0] <= self.inputs.getInputDimension(), "Error; if using orthoWts then the number units in the first hidden layer must be no more then the input dimension({0})".format(str(self.inputs.getInputDimension()))
 
     def execute( self, nIterations=1, procIndex=-1 ):
         # type: () -> FitResult
@@ -105,6 +107,9 @@ class LearningModel:
         for iterIndex in range(nIterations):
             model = self.createSequentialModel()
             initial_weights = model.get_weights()
+            if self.orthoWts:
+                initial_weights[0] = Analytics.orthoModes( self.inputData, self.hidden[0] )
+                model.set_weights( initial_weights )
             history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, callbacks=[self.tensorboard], verbose=0 )  # type: History
             self.updateHistory( history, initial_weights, iterIndex, procIndex )
         return self.bestFitResult

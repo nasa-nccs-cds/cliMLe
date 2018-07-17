@@ -7,13 +7,13 @@ outDir = os.path.expanduser("~/results")
 
 pname = "20CRv2c"
 projectName = pname + "_EOFs"
-nModes = 8
+nModes = 16
 start_year = 1851
 end_year = 2012
 nTS = 1
 smooth = 0
 freq="Y"   # Yearly input/outputs
-filter="jjas"   # Filter months out of each year.
+filter="jja"   # Filter months out of each year.
 learning_range = CTimeRange.new( "1851-1-1", "2005-12-1" )
 
 variables = [ Variable("ts"), Variable( "zg", 25000 ) ]  # [ Variable("ts"), Variable( "zg", 80000 ), Variable( "zg", 50000 ), Variable( "zg", 25000 ) ]
@@ -24,17 +24,17 @@ inputDataset = InputDataset( [ pcDataset ] )
 prediction_lag = CDuration.years(1)
 nInterationsPerProc = 20
 batchSize = 150
-maxTrainingLoss = 0.8
+maxTrainingLoss = 0.4
 nEpocs = 600
 learnRate = 0.002
-momentum=0.001
+momentum=0.00
 decay=0.0
 nesterov=False
 validation_fraction = 0.2
-hiddenLayers = [100]
+hiddenLayers = [ pcDataset.getInputDimension() ]
 activation = "relu"
 plotPrediction = True
-
+orthoWts=False
 
 tds = [ IITMDataSource( domain, "JJAS" ) for domain in [ "AI" ] ] # [ "AI", "EPI", "NCI", "NEI", "NMI", "NWI", "SPI", "WPI"]
 trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag )
@@ -43,7 +43,7 @@ trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag )
 #ref_ts = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], ref_time_range )
 
 def learning_model_factory( weights = None ):
-    return LearningModel( inputDataset, trainingDataset, batch=batchSize, lrate=learnRate, momentum=momentum, decay=decay, nesterov=nesterov, epocs=nEpocs, vf=validation_fraction, hidden=hiddenLayers, max_loss=maxTrainingLoss, activation=activation, weights=weights )
+    return LearningModel( inputDataset, trainingDataset, batch=batchSize, lrate=learnRate, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, hidden=hiddenLayers, max_loss=maxTrainingLoss, activation=activation, weights=weights )
 
 result = LearningModel.parallel_execute( learning_model_factory, nInterationsPerProc )
 print "Got Best result, valuation loss = " + str( result.val_loss ) + " training loss = " + str( result.train_loss )

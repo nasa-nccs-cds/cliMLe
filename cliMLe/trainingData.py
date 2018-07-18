@@ -1,12 +1,13 @@
 import os, itertools, datetime
 import cdms2 as cdms
 import numpy as np
-import logging, traceback
+import logging, abc, traceback
 from cdms2.selectors import Selector
 import matplotlib.pyplot as plt
 from cliMLe.dataProcessing import Analytics, CTimeRange, CDuration
 from typing import List, Union, Dict, Any
 from cliMLe.pcProject import PCDataset
+from cliMLe.dataProcessing import Parser
 
 class TimeseriesData:
 
@@ -18,6 +19,7 @@ class TimeseriesData:
         self.output_size = len( self.series.keys() )
 
 class DataSource:
+    __metaclass__ = abc.ABCMeta
 
     def __init__(self, name ):
          # type: (str) -> None
@@ -31,6 +33,9 @@ class DataSource:
     def getTimeseries( self, timeRange, **kwargs ): raise NotImplementedError
         # type: ( Union[bool,int] ) -> TimeseriesData
 
+    @abc.abstractmethod
+    def serialize(self,lines):
+        return None
 
 class ProjectDataSource(DataSource):
 
@@ -70,6 +75,9 @@ class ProjectDataSource(DataSource):
         dset = cdms.open( self.dataFile )
         return dset.variables.keys()
 
+    def deserialize(self):
+        return None
+
 
 class IITMDataSource(DataSource):
 
@@ -81,6 +89,14 @@ class IITMDataSource(DataSource):
         DataSource.__init__(self, name)
         self.type = _type.lower()
         self.dataFile = self.getDataFilePath("IITM","txt")
+
+    def serialize(self,lines):
+        lines.append( "@IITMDataSource:" + ",".join( [ self.name, self.type ] ) )
+
+    @staticmethod
+    def deserialize( spec ):
+        toks =  spec.split(":")[1].split(",")
+        return IITMDataSource( toks[0], toks[1] )
 
     def getTypeIndices(self):
         if self.type.startswith("ann"):
@@ -147,13 +163,40 @@ class IITMDataSource(DataSource):
 
 class TrainingDataset:
 
-    def __init__(self, sources, _predictionLag, **kwargs ):
+    def __init__(self, sources, **kwargs ):
         # type: ( list[DataSource], CDuration ) -> None
         self.dataSources = sources
         self.smooth = kwargs.get("smooth",0)
         self.decycle = kwargs.get("decycle", False)
         self.trainingRange = kwargs.get( "trainingRange", None ) # type: CTimeRange
         self._timeseries = []
+
+    def serialize(self, lines ):
+        # type: (list[str]) -> None
+        lines.append( "#TrainingDataset" )
+        Parser.sparm( lines, "smooth", self.smooth )
+        Parser.sparm( lines, "decycle", self.decycle )
+        if self.trainingRange:
+            Parser.sparm( lines, "trainingRange", self.trainingRange.serialize() )
+        for source in self.dataSources: source.serialize(lines)
+
+    @staticmethod
+    def deserialize( lines ):
+        # type: (list[str]) -> TrainingDataset
+        active = False
+        parms = {}
+        dataSources = []
+        for line in lines:
+            if line.startswith("#TrainingDataset"):
+                active = True
+            elif active:
+                if line.startswith("#"): break
+                elif line.startswith("@P:"):
+                    toks = line.split(":")[1].split("=")
+                    parms[toks[0]] = toks[1]
+                elif line.startswith("@IITMDataSource:"):
+                    dataSources.append( IITMDataSource.deserialize(line) )
+        return TrainingDataset( dataSources, **parms )
 
     @classmethod
     def new(cls, sources, inputDataset, predictionLag, **kwargs):
@@ -162,7 +205,7 @@ class TrainingDataset:
         smooth = inputDataset.smooth if inputDataset is not None else 0
         trainingRange = inputDataset.timeRange.shift(predictionLag.inc(offset))
  #       trainingRange1 = trainingRange.extend( CDuration.months( offset ) )
-        return cls( sources, predictionLag, smooth=smooth, trainingRange=trainingRange, **kwargs )
+        return cls( sources, smooth=smooth, trainingRange=trainingRange, **kwargs )
 
     def targetNames(self):
         return [ source.name for source in self.dataSources ]

@@ -13,20 +13,20 @@ end_year = 2012
 nTS = 1
 smooth = 0
 freq="Y"   # Yearly input/outputs
-filter="jja"   # Filter months out of each year.
+filter="ja"   # Filter months out of each year.
 learning_range = CTimeRange.new( "1851-1-1", "2005-12-1" )
 
 variables = [ Variable("ts"), Variable( "zg", 25000 ) ]  # [ Variable("ts"), Variable( "zg", 80000 ), Variable( "zg", 50000 ), Variable( "zg", 25000 ) ]
-project = Project(outDir,projectName)
+project = Project.new(outDir,projectName)
 pcDataset = PCDataset( projectName, [ Experiment(project,start_year,end_year,64,variable) for variable in variables ], nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = learning_range )
 inputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
-nInterationsPerProc = 20
+nInterationsPerProc = 10
 batchSize = 150
 maxTrainingLoss = 0.4
-nEpocs = 600
-learnRate = 0.002
+nEpocs = 300
+learnRate = 0.005
 momentum=0.00
 decay=0.0
 nesterov=False
@@ -48,8 +48,11 @@ def learning_model_factory( weights = None ):
 result = LearningModel.parallel_execute( learning_model_factory, nInterationsPerProc )
 print "Got Best result, valuation loss = " + str( result.val_loss ) + " training loss = " + str( result.train_loss )
 
+learningModel = learning_model_factory()
+learningModel.serialize( inputDataset, trainingDataset, result )
+
 if plotPrediction:
     plot_title = "Training data with Prediction ({0}->IITM, lag {1}) {2}-{3} (loss: {4}, Epochs: {5})".format(pcDataset.getVariableIds(),prediction_lag,start_year,end_year,result.val_loss,result.nEpocs)
-    learningModel = learning_model_factory()
     learningModel.plotPrediction( result, "Monsoon Prediction with IITM" )
     learningModel.plotPerformance( result, plot_title )
+

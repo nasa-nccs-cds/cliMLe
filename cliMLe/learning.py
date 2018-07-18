@@ -19,8 +19,10 @@ outDir = os.path.join( os.path.expanduser("~"), "results" )
 LOG_FILE = os.path.join( outDir, 'logs', 'cliMLe.log' )
 try: os.makedirs( os.path.dirname(LOG_FILE) )
 except: pass
+RESULTS_DIR = os.path.join( outDir, 'results' )
+try: os.makedirs( RESULTS_DIR )
+except: pass
 logging.basicConfig(filename=LOG_FILE,level=logging.DEBUG)
-
 
 class FitResult:
 
@@ -37,6 +39,16 @@ class FitResult:
         self.val_loss = _val_loss
         self.train_loss = _training_loss
         self.nEpocs = _nEpocs
+
+    def serialize( self, lines ):
+        lines.append( "#Result" )
+        Parser.sparm( lines, "val_loss", self.val_loss )
+        Parser.sparm( lines, "train_loss", self.train_loss )
+        Parser.sparm( lines, "nepocs", self.nEpocs )
+        Parser.sarray( lines, "val_loss_history", self.val_loss_history )
+        Parser.sarray( lines, "train_loss_history", self.train_loss_history )
+        Parser.swts( lines, "initial", self.initial_weights )
+        Parser.swts( lines, "final", self.final_weights )
 
     def valLossHistory(self):
         return self.val_loss_history
@@ -77,6 +89,7 @@ class LearningModel:
         # type: (InputDataset, TrainingDataset) -> None
         self.inputs = inputDataset                  # type: PCDataset
         self.outputs = trainingDataset              # type: TrainingDataset
+        self.parms = kwargs
         self.batchSize = kwargs.get( 'batch', 50 )
         self.nEpocs = kwargs.get( 'epocs', 300 )
         self.validation_fraction = kwargs.get(  'vf', 0.1 )
@@ -113,6 +126,21 @@ class LearningModel:
             history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, callbacks=[self.tensorboard], verbose=0 )  # type: History
             self.updateHistory( history, initial_weights, iterIndex, procIndex )
         return self.bestFitResult
+
+    def serialize( self, inputDataset, trainingDataset, result ):
+        # type: (InputDataset, TrainingDataset, FitResult) -> None
+        lines = []
+        inputDataset.serialize( lines )
+        trainingDataset.serialize( lines )
+        lines.append( "#LearningModel" )
+        Parser.sparms(lines,self.parms)
+        result.serialize( lines )
+        outputFile = inputDataset.getName() + "_" + str(datetime.now()).replace(" ","_")
+        outputPath = os.path.join( RESULTS_DIR, outputFile )
+        olines = [ line + "\n" for line in lines ]
+        with open( outputPath, "w" ) as file:
+            file.writelines( olines )
+        print "Saved results to " + outputPath
 
     def reseed(self):
         seed = random.randint(0, 2 ** 32 - 2)

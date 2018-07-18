@@ -1,21 +1,30 @@
 import abc, os, logging
 import numpy as np
 import cdms2 as cdms
-from cliMLe.dataProcessing import Analytics, CTimeRange, CDuration
+from cliMLe.dataProcessing import Analytics, CTimeRange, Parser
 
 class InputDataSource:
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, _name, **kwargs ):
        self.name = _name
-       self.timeRange = kwargs.get( "timeRange", None ) # type: CTimeRange
-       self.normalize = kwargs.get("norm",True)
-       self.nTSteps = kwargs.get( "nts", 1 )
-       self.smooth = kwargs.get( "smooth", 0 )
-       self.decycle = kwargs.get("decycle", False)
+       self.timeRange = CTimeRange.deserialize( kwargs.get( "timeRange", None ) ) # type: CTimeRange
+       self.normalize = bool( kwargs.get("norm","True") )
+       self.nTSteps = int( kwargs.get( "nts", "1" ) )
+       self.smooth = int( kwargs.get( "smooth", "0" ) )
+       self.decycle = bool( kwargs.get("decycle", "False" ) )
        self.freq = kwargs.get("freq", "M")
        self.filter = kwargs.get("filter", "")
        self.rootDir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
+    def serialize(self,lines):
+        Parser.sparm( lines, "normalize", self.normalize )
+        Parser.sparm( lines, "nTSteps", self.nTSteps )
+        Parser.sparm( lines, "smooth", self.smooth )
+        Parser.sparm( lines, "decycle", self.decycle )
+        Parser.sparm( lines, "freq", self.freq )
+        Parser.sparm( lines, "filter", self.filter )
+        Parser.sparm( lines, "timeRange", self.timeRange.serialize() )
 
     def getDataFilePath(self, type, ext ):
         # type: (str,str) -> str
@@ -54,6 +63,18 @@ class InputDataset:
         # type: () -> int
         return sum( [ source.getInputDimension() for source in self.sources ] )
 
+    def serialize(self, lines ):
+        for source in self.sources: source.serialize(lines)
+
+    @staticmethod
+    def deserialize( lines ):
+        # type: (list[str]) -> InputDataset
+        from cliMLe.pcProject import PCDataset
+        sources = []
+        for iLine in range(len(lines)):
+            if lines[iLine].startswith("#PCDataset"):
+                sources.append( PCDataset.deserialize( lines[iLine:]) )
+        return InputDataset( sources )
 
 class CDMSInputSource(InputDataSource):
 

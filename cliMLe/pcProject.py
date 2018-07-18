@@ -3,7 +3,7 @@ import cdms2 as cdms
 import logging, traceback
 import numpy as np
 from typing import List, Union
-from cliMLe.dataProcessing import Analytics, CTimeRange, CDuration
+from cliMLe.dataProcessing import Analytics, CTimeRange, Parser
 from cliMLe.inputData import InputDataSource
 
 PC = 0
@@ -16,16 +16,30 @@ EPOCH = 2
 class Variable:
     def __init__(self, _varname, _level = None ):
         self.varname = _varname
-        self.level = _level
+        self.level = Variable.deserialize( _level )
         self.id = self.varname + "-" + str(self.level) if self.level else self.varname
+
+    @staticmethod
+    def deserialize( spec ):
+        if spec is None: return None
+        elif isinstance( spec, str ):
+            if spec.lower() == "none": return None
+            else: return int( spec )
+        else: return spec
+
 
 class Project:
 
-    def __init__(self, baseDir, _name ):
+    def __init__(self, _dir, _name ):
         self.name = _name
-        self.directory = os.path.join( baseDir, _name )
+        self.directory = _dir
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
+
+    @staticmethod
+    def new( baseDir, name ):
+        directory = os.path.join( baseDir, name )
+        return Project( directory, name )
 
 class Experiment:
 
@@ -37,6 +51,15 @@ class Experiment:
         self.nModes = _nModes
         self.variable = _variable
         self.id = self.project.name + '_' + str(self.start_year) + '-' + str(self.end_year) + '_M' + str(self.nModes) + "_" + self.variable.id
+
+    def serialize( self, lines ):
+        lines.append( "@E:" + ",".join( [ self.project.directory, self.project.name, str(self.start_year), str(self.end_year), str(self.nModes), self.variable.varname, str(self.variable.level) ] ) )
+
+    @staticmethod
+    def deserialize( spec ):
+        # type: (str) -> Experiment
+        toks = spec.split(":")[1].split(",")
+        return Experiment( Project( toks[0], toks[1] ),  int(toks[2]), int(toks[3]), int(toks[4]), Variable( toks[5], toks[6] ) )
 
     def outfilePath(self, rType ):
         # type: (int) -> str
@@ -72,7 +95,7 @@ class PCDataset(InputDataSource):
     def __init__(self, name, _experiments, **kwargs ):
        # type: ( str, list[Experiment] ) -> None
        super(PCDataset, self).__init__(name, **kwargs)
-       self.nModes = kwargs.get( "nmodes", -1 )
+       self.nModes = int( kwargs.get( "nmodes", "-1" ) )
        self.experiments = _experiments if isinstance( _experiments, (list, tuple) ) else [ _experiments ] # type: List[Experiment]
        self.selector = self.timeRange.selector() if self.timeRange else None
        input_cols = []
@@ -84,6 +107,32 @@ class PCDataset(InputDataSource):
            for iTS in range( self.nTSteps ):
                input_cols.extend( [self.preprocess(var,iTS) for var in self.getVariables()] )
            self.data = np.column_stack( input_cols )
+
+    def serialize(self,lines):
+        lines.append( "#PCDataset:" + self.name )
+        Parser.sparm( lines, "nmodes", self.nModes )
+        InputDataSource.serialize(self,lines)
+        for experiment in self.experiments: experiment.serialize(lines)
+
+    @staticmethod
+    def deserialize( lines ):
+        # type: (list[str]) -> PCDataset
+        active = False
+        dsname = None
+        parms = {}
+        experiments = []
+        for line in lines:
+            if line.startswith("#PCDataset"):
+                active = True
+                dsname = line.split(":")[1]
+            elif active:
+                if line.startswith("#"): break
+                elif line.startswith("@P:"):
+                    toks = line.split(":")[1].split("=")
+                    parms[toks[0]] = toks[1]
+                elif line.startswith("@E:"):
+                    experiments.append( Experiment.deserialize(line) )
+        return PCDataset( dsname, experiments, **parms )
 
     def getVariables(self):
         # type: () -> list[cdms.tvariable.TransientVariable]

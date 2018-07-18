@@ -5,6 +5,38 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+class Parser:
+
+    @staticmethod
+    def sparm( lines, name, value ):
+        lines.append(  "@P:" + name + "=" + str(value) )
+
+    @staticmethod
+    def sparms( lines, parms ):
+        for item in parms.items():
+            Parser.sparm( lines, item[0], item[1] )
+
+    @staticmethod
+    def sarray( lines, name, data ):
+        sdata = [ str(v) for v in data ]
+        lines.append( "@A:" + name + "=" + ",".join(sdata) )
+
+    @staticmethod
+    def swts( lines, name, weights ):
+        # type: (list[str], str, list[np.ndarray]) -> None
+        wt_lines = []
+        for wt_layer in weights:
+            shape = ",".join( [ str(x) for x in wt_layer.shape ] )
+            data = ",".join( [ str(x) for x in wt_layer.flat ] )
+            wt_lines.append( ":".join( [shape,data] ) )
+        lines.append( "@W:" + name + "=" + ";".join(wt_lines) )
+
+    @staticmethod
+    def rwts( spec ):
+        # type: (str) -> list[np.ndarray]
+        sarrays = spec.split(";")
+        return [ np.loads(w) for w in sarrays ]
+
 class Analytics:
     smoothing_kernel = np.array([.13, .23, .28, .23, .13])
     months = "jfmamjjasonjfmamjjason"
@@ -148,6 +180,22 @@ class CTimeRange:
         self.startDate = start
         self.endDate = end
         self.dateRange = self.getDateRange()
+
+    def serialize(self):
+        return str(self.startDate) + "," + str(self.endDate)
+
+    @staticmethod
+    def deserialize( spec ):
+        if spec is None:
+            return None
+        elif isinstance(spec, CTimeRange):
+            return spec
+        elif isinstance( spec, str ):
+            dates = spec.split(",")
+            return CTimeRange( CDate.new(dates[0]), CDate.new(dates[1]) )
+        else:
+            raise Exception( "Object of type {0} cannot be converted to a CTimeRange".format( spec.__class__.__name__ ) )
+
 
     @classmethod
     def new(cls, start, end ):

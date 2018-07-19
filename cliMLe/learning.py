@@ -188,6 +188,7 @@ class LearningModel:
 
     @classmethod
     def load( cls, path ):
+        # type: (str) -> ( LearningModel, FitResult )
         file = open( path, "r")
         lines = file.readlines()
         inputDataset = InputDataset.deserialize(lines)
@@ -198,6 +199,7 @@ class LearningModel:
 
     @classmethod
     def loadInstance( cls, instance ):
+        # type: (str) -> ( LearningModel, FitResult )
         return cls.load( os.path.join( RESULTS_DIR, instance ) )
 
     def reseed(self):

@@ -1,6 +1,5 @@
 from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
-outDir = os.path.expanduser("~/results")
 
 instance = "20CRv2c_EOFs_2018-07-19_16:06:14.560105"
 

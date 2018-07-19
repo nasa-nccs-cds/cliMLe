@@ -27,7 +27,7 @@ logging.basicConfig(filename=LOG_FILE,level=logging.DEBUG)
 class FitResult:
 
     @staticmethod
-    def new( history, initial_weights, training_loss, val_loss,  nEpocs):
+    def new( history, initial_weights, training_loss, val_loss,  nEpocs ):
         # type: (History, list[np.ndarray], float, int) -> FitResult
         return FitResult( history.history['val_loss'], history.history['loss'], initial_weights, history.model.get_weights(),  training_loss, val_loss, nEpocs )
 
@@ -39,6 +39,9 @@ class FitResult:
         self.val_loss = float( _val_loss )
         self.train_loss = float( _training_loss )
         self.nEpocs = int( _nEpocs )
+
+    def getScore( self, score_val_weight ):
+        return score_val_weight * self.val_loss + self.train_loss
 
     def serialize( self, lines ):
         lines.append( "#Result" )
@@ -125,13 +128,14 @@ class LearningModel:
         self.timeRange = kwargs.get(  'timeRange', None )
         self.hidden = Parser.raint( kwargs.get( 'hidden', [16] ) )
         self.shuffle = bool( kwargs.get('shuffle', False ) )
+        self.lossFunction = kwargs.get('loss_function', 'mse' )
         self.orthoWts = bool( kwargs.get('orthoWts', False ) )
         self.weights = Parser.ro( kwargs.get( 'weights', None ) )
         self.lr = float( kwargs.get( 'lrate', 0.01 ) )
         self.momentum = float( kwargs.get( 'momentum', 0.0 ) )
         self.decay = float( kwargs.get( 'decay', 0.0 ) )
         self.nesterov = bool( kwargs.get( 'nesterov', False ) )
-        self.max_loss = float( kwargs.get( 'max_loss', sys.float_info.max ) )
+        self.score_val_weight = float( kwargs.get( 'score_val_weight', 10.0 ) )
         self.activation = kwargs.get( 'activation', 'relu' )
         self.timestamp = datetime.now().strftime("%m-%d-%y.%H:%M:%S")
         self.projectName = self.inputs.getName()
@@ -257,7 +261,7 @@ class LearningModel:
         output_layer = Dense(units=nOutputs) if nHidden else Dense(units=nOutputs, input_dim=nInputs)
         model.add( output_layer )
         sgd = SGD( lr=self.lr, decay=self.decay, momentum=self.momentum, nesterov=self.nesterov )
-        model.compile(loss='mse', optimizer=sgd, metrics=['accuracy'])
+        model.compile(loss=self.lossFunction, optimizer=sgd, metrics=['accuracy'])
         if self.weights is not None: model.set_weights(self.weights)
         return model
 
@@ -265,24 +269,24 @@ class LearningModel:
         # type: (History, list[np.ndarray], int, int) -> History
         val_loss = history.history['val_loss']
         training_loss = history.history['loss']
-        current_min_loss_val = sys.float_info.max
-        current_min_loss_index = -1
+        current_min_score_val = sys.float_info.max
+        current_min_score_index = -1
         for i in xrange( len(val_loss) ):
             vloss, tloss = val_loss[i], training_loss[i]
-            if tloss < self.max_loss and vloss < current_min_loss_val:
-               current_min_loss_val =  vloss
-               current_min_loss_index = i
-        if current_min_loss_index > 0:
-            if not self.bestFitResult or ( current_min_loss_val < self.bestFitResult.val_loss ):
-                self.bestFitResult = FitResult.new( history, initial_weights, training_loss[-1], current_min_loss_val, current_min_loss_index )
-            if procIndex < 0:   print "Executed iteration {0}, current loss = {1}  (NE={2}), best loss = {3} (NE={4})".format(iterIndex, current_min_loss_val, current_min_loss_index, self.bestFitResult.val_loss, self.bestFitResult.nEpocs )
-            else:               logging.info( "PROC[{0}]: Iteration {1}, val_loss = {2}, val_loss index = {3}, min val_loss = {4}".format( procIndex, iterIndex, current_min_loss_val, current_min_loss_index, self.bestFitResult.val_loss ) )
+            if vloss < current_min_score_val:
+               current_min_score_val =  vloss
+               current_min_score_index = i
+        if current_min_score_index > 0:
+            if not self.bestFitResult or ( current_min_score_val < self.bestFitResult.val_loss ):
+                self.bestFitResult = FitResult.new( history, initial_weights, training_loss[current_min_score_index], val_loss[current_min_score_index], current_min_score_index )
+            if procIndex < 0:   print "Executed iteration {0}, current loss = {1}  (NE={2}), best loss = {3} (NE={4})".format(iterIndex, current_min_score_val, current_min_score_index, self.bestFitResult.val_loss, self.bestFitResult.nEpocs )
+            else:               logging.info( "PROC[{0}]: Iteration {1}, val_loss = {2}, val_loss index = {3}, min val_loss = {4}".format( procIndex, iterIndex, current_min_score_val, current_min_score_index, self.bestFitResult.val_loss ) )
         return history
 
     def plotPrediction( self, fitResult, title, **kwargs ):
         # type: (FitResult, str) -> None
         print "Plotting result: " + title
-        print " ---> NEpocs = {0}, loss = {1}, loss history = {2}".format(fitResult.nEpocs, fitResult.val_loss, str(fitResult.val_loss_history))
+        print " ---> NEpocs = {0}, val loss = {1}, training loss = {2}".format(fitResult.nEpocs, fitResult.val_loss, fitResult.train_loss )
         model1 = self.getFittedModel(fitResult)
         prediction1 = model1.predict( self.inputData )  # type: np.ndarray
         targetNames = self.outputs.targetNames()

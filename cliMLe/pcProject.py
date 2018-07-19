@@ -23,7 +23,8 @@ class Variable:
     def deserialize( spec ):
         if spec is None: return None
         elif isinstance( spec, str ):
-            if spec.lower() == "none": return None
+            spec = spec.lower().strip()
+            if spec == "none": return None
             else: return int( spec )
         else: return spec
 
@@ -129,7 +130,7 @@ class PCDataset(InputDataSource):
                 if line.startswith("#"): break
                 elif line.startswith("@P:"):
                     toks = line.split(":")[1].split("=")
-                    parms[toks[0]] = toks[1]
+                    parms[toks[0]] = toks[1].strip()
                 elif line.startswith("@E:"):
                     experiments.append( Experiment.deserialize(line) )
         return PCDataset( dsname, experiments, **parms )
@@ -152,6 +153,9 @@ class PCDataset(InputDataSource):
     def getVariableIds(self):
         # type: () -> str
         return "[" + ",".join( exp.variable.id for exp in self.experiments ) +"]"
+
+    def getExperimentIds(self):
+        return "-". join( [ exp.id for exp in self.experiments ] )
 
     def preprocess(self, var, offset=0 ):
         debug = False

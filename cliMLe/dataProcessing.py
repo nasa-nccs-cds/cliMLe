@@ -28,7 +28,7 @@ class Parser:
         for wt_layer in weights:
             shape = ",".join( [ str(x) for x in wt_layer.shape ] )
             data = ",".join( [ str(x) for x in wt_layer.flat ] )
-            wt_lines.append( ":".join( [shape,data] ) )
+            wt_lines.append( "|".join( [shape,data] ) )
         lines.append( "@W:" + name + "=" + ";".join(wt_lines) )
 
     @staticmethod
@@ -36,6 +36,22 @@ class Parser:
         # type: (str) -> list[np.ndarray]
         sarrays = spec.split(";")
         return [ np.loads(w) for w in sarrays ]
+
+    @staticmethod
+    def raint( spec ):
+        # type: (str) -> list[int]
+        if spec is None: return None
+        elif isinstance( spec, str ):
+            spec = spec.strip().strip("[]")
+            return [ int(x) for x in spec.split(",")]
+        else: return spec
+
+    @staticmethod
+    def ro( spec ):
+        # type: (str) -> object
+        if spec is None: return None
+        elif isinstance( spec, str ) and ( spec.lower() == "none" ): return None
+        else: return spec
 
 class Analytics:
     smoothing_kernel = np.array([.13, .23, .28, .23, .13])
@@ -59,9 +75,11 @@ class Analytics:
             start_index = int(filter)
             return (start_index, 1)
         except:
-            start_index = "xjfmamjjasondjfmamjjasond".index(filter.lower())
-            if start_index < 0: raise Exception("Unrecognizable filter value: " + filter )
-            return ( start_index, len(filter) )
+            try:
+                start_index = "xjfmamjjasondjfmamjjasond".index(filter.lower())
+                return ( start_index, len(filter) )
+            except ValueError:
+                raise Exception( "Unrecognizable filter value: '{0}' ".format(filter) )
 
     @classmethod
     def lowpass( cls, data ):

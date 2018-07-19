@@ -96,7 +96,7 @@ class IITMDataSource(DataSource):
     @staticmethod
     def deserialize( spec ):
         toks =  spec.split(":")[1].split(",")
-        return IITMDataSource( toks[0], toks[1] )
+        return IITMDataSource( toks[0], toks[1].strip() )
 
     def getTypeIndices(self):
         if self.type.startswith("ann"):
@@ -110,7 +110,7 @@ class IITMDataSource(DataSource):
         elif self.type == "ond":
             return 17, 11
         else:
-            raise Exception( "Unrecognized Data source type: " + self.type )
+            raise Exception( "Unrecognized Data source type: '{0}'".format(self.type) )
 
     def freq(self):
         if self.type == "monthly": return "M"
@@ -120,9 +120,9 @@ class IITMDataSource(DataSource):
         # type: ( CTimeRange ) -> TimeseriesData
         dset = open(self.dataFile,"r")
         lines = dset.readlines()
-        normalize = kwargs.get("norm", True)
-        smooth = kwargs.get("smooth", 0)
-        decycle = kwargs.get( "decycle", False )
+        normalize = bool( kwargs.get("norm", True) )
+        smooth = int( kwargs.get("smooth", 0) )
+        decycle = bool( kwargs.get( "decycle", False ) )
 
         timeseries = []
         dates = []
@@ -168,7 +168,7 @@ class TrainingDataset:
         self.dataSources = sources
         self.smooth = kwargs.get("smooth",0)
         self.decycle = kwargs.get("decycle", False)
-        self.trainingRange = kwargs.get( "trainingRange", None ) # type: CTimeRange
+        self.trainingRange = CTimeRange.deserialize( kwargs.get( "trainingRange", None ) ) # type: CTimeRange
         self._timeseries = []
 
     def serialize(self, lines ):
@@ -193,7 +193,7 @@ class TrainingDataset:
                 if line.startswith("#"): break
                 elif line.startswith("@P:"):
                     toks = line.split(":")[1].split("=")
-                    parms[toks[0]] = toks[1]
+                    parms[toks[0]] = toks[1].strip()
                 elif line.startswith("@IITMDataSource:"):
                     dataSources.append( IITMDataSource.deserialize(line) )
         return TrainingDataset( dataSources, **parms )
@@ -209,6 +209,8 @@ class TrainingDataset:
 
     def targetNames(self):
         return [ source.name for source in self.dataSources ]
+
+    def id(self): return "-".join( self.targetNames() )
 
     def addDataSource(self, dsource ):
         # type: (DataSource) -> None

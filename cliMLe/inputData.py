@@ -43,6 +43,15 @@ class InputDataSource:
         # type: () -> int
         return
 
+    @abc.abstractmethod
+    def getVariableIds(self):
+        # type: () -> str
+        return
+
+    @abc.abstractmethod
+    def getExperimentIds(self):
+        # type: () -> str
+        return
 
 class InputDataset:
 
@@ -65,6 +74,12 @@ class InputDataset:
 
     def serialize(self, lines ):
         for source in self.sources: source.serialize(lines)
+
+    def getVariableIds(self):
+        return "--". join( [ src.getVariableIds() for src in self.sources ] )
+
+    def getExperimentIds(self):
+        return "--". join( [ src.getExperimentIds() for src in self.sources ] )
 
     @staticmethod
     def deserialize( lines ):
@@ -129,6 +144,15 @@ class CDMSInputSource(InputDataSource):
         # type: () -> list[str]
         dset = cdms.open( self.dataFile )
         return dset.variables.keys()
+
+    def getVariableIds(self):
+        # type: () -> str
+        return "-".join( self.listVariables() )
+
+    @abc.abstractmethod
+    def getExperimentIds(self):
+        return ""
+
 
     def initialize(self):
         if self.data == None:

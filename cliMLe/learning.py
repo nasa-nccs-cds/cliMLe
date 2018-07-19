@@ -36,9 +36,9 @@ class FitResult:
         self.train_loss_history = _train_loss_history
         self.initial_weights = _initial_weights
         self.final_weights = _final_weights
-        self.val_loss = _val_loss
-        self.train_loss = _training_loss
-        self.nEpocs = _nEpocs
+        self.val_loss = float( _val_loss )
+        self.train_loss = float( _training_loss )
+        self.nEpocs = int( _nEpocs )
 
     def serialize( self, lines ):
         lines.append( "#Result" )
@@ -49,6 +49,35 @@ class FitResult:
         Parser.sarray( lines, "train_loss_history", self.train_loss_history )
         Parser.swts( lines, "initial", self.initial_weights )
         Parser.swts( lines, "final", self.final_weights )
+
+    @staticmethod
+    def deserialize( lines ):
+        active = False
+        parms = {}
+        arrays = {}
+        weights = {}
+        for line in lines:
+            if line.startswith("#Result"):
+                active = True
+            elif active:
+                if line.startswith("#"): break
+                elif line.startswith("@P:"):
+                    toks = line.split(":")[1].split("=")
+                    parms[toks[0]] = toks[1].strip()
+                elif line.startswith("@A:"):
+                    toks = line.split(":")[1].split("=")
+                    arrays[toks[0]] = [ float(x) for x in toks[1].split(",") ]
+                elif line.startswith("@W:"):
+                    toks = line.split(":")[1].split("=")
+                    wts = []
+                    for wtLine in toks[1].split(";"):
+                        wtToks = wtLine.split("|")
+                        shape = [int(x) for x in wtToks[0].split(",")]
+                        data = [float(x) for x in wtToks[1].split(",")]
+                        wts.append( np.array(data).reshape(shape) )
+                    weights[toks[0]] = wts
+        return FitResult( arrays["val_loss_history"], arrays["train_loss_history"], weights["initial"], weights["final"], parms["train_loss"],  parms["val_loss"], parms["nepocs"] )
+
 
     def valLossHistory(self):
         return self.val_loss_history
@@ -87,22 +116,22 @@ class LearningModel:
 
     def __init__( self, inputDataset, trainingDataset,  **kwargs ):
         # type: (InputDataset, TrainingDataset) -> None
-        self.inputs = inputDataset                  # type: PCDataset
+        self.inputs = inputDataset                  # type: InputDataset
         self.outputs = trainingDataset              # type: TrainingDataset
         self.parms = kwargs
-        self.batchSize = kwargs.get( 'batch', 50 )
-        self.nEpocs = kwargs.get( 'epocs', 300 )
-        self.validation_fraction = kwargs.get(  'vf', 0.1 )
+        self.batchSize = int( kwargs.get( 'batch', 50 ) )
+        self.nEpocs = int( kwargs.get( 'epocs', 300 ) )
+        self.validation_fraction = float( kwargs.get(  'vf', 0.1 ) )
         self.timeRange = kwargs.get(  'timeRange', None )
-        self.hidden = kwargs.get( 'hidden', [16] )
-        self.shuffle = kwargs.get('shuffle', False )
-        self.orthoWts = kwargs.get('orthoWts', False )
-        self.weights = kwargs.get( 'weights', None )
-        self.lr = kwargs.get( 'lrate', 0.01 )
-        self.momentum = kwargs.get( 'momentum', 0.0 )
-        self.decay = kwargs.get( 'decay', 0.0 )
-        self.nesterov = kwargs.get( 'nesterov', False )
-        self.max_loss = kwargs.get( 'max_loss', sys.float_info.max )
+        self.hidden = Parser.raint( kwargs.get( 'hidden', [16] ) )
+        self.shuffle = bool( kwargs.get('shuffle', False ) )
+        self.orthoWts = bool( kwargs.get('orthoWts', False ) )
+        self.weights = Parser.ro( kwargs.get( 'weights', None ) )
+        self.lr = float( kwargs.get( 'lrate', 0.01 ) )
+        self.momentum = float( kwargs.get( 'momentum', 0.0 ) )
+        self.decay = float( kwargs.get( 'decay', 0.0 ) )
+        self.nesterov = bool( kwargs.get( 'nesterov', False ) )
+        self.max_loss = float( kwargs.get( 'max_loss', sys.float_info.max ) )
         self.activation = kwargs.get( 'activation', 'relu' )
         self.timestamp = datetime.now().strftime("%m-%d-%y.%H:%M:%S")
         self.projectName = self.inputs.getName()
@@ -141,10 +170,40 @@ class LearningModel:
         with open( outputPath, "w" ) as file:
             file.writelines( olines )
         print "Saved results to " + outputPath
+        return outputPath
+
+    @staticmethod
+    def deserialize( inputDataset, trainingDataset, lines ):
+        active = False
+        parms = {}
+        for line in lines:
+            if line.startswith("#LearningModel"):
+                active = True
+            elif active:
+                if line.startswith("#"): break
+                elif line.startswith("@P:"):
+                    toks = line.split(":")[1].split("=")
+                    parms[toks[0]] = toks[1].strip()
+        return LearningModel( inputDataset, trainingDataset, **parms )
+
+    @classmethod
+    def load( cls, path ):
+        file = open( path, "r")
+        lines = file.readlines()
+        inputDataset = InputDataset.deserialize(lines)
+        trainingDataset = TrainingDataset.deserialize( lines )
+        learningModel = LearningModel.deserialize( inputDataset, trainingDataset, lines )
+        result = FitResult.deserialize( lines )
+        return ( learningModel, result )
+
+    @classmethod
+    def loadInstance( cls, instance ):
+        return cls.load( os.path.join( RESULTS_DIR, instance ) )
 
     def reseed(self):
         seed = random.randint(0, 2 ** 32 - 2)
         np.random.seed(seed)
+
 
     def getRandomWeights(self):
         self.reseed()

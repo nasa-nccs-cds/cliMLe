@@ -136,7 +136,6 @@ class LearningModel:
         self.decay = float( kwargs.get( 'decay', 0.0 ) )
         self.nesterov = bool( kwargs.get( 'nesterov', False ) )
         self.score_val_weight = float( kwargs.get( 'score_val_weight', 10.0 ) )
-        self.activation = kwargs.get( 'activation', 'relu' )
         self.timestamp = datetime.now().strftime("%m-%d-%y.%H:%M:%S")
         self.projectName = self.inputs.getName()
         self.logDir = os.path.expanduser("~/results/logs/{}".format( self.projectName + "_" + self.timestamp ) )
@@ -166,8 +165,8 @@ class LearningModel:
         inputDataset.serialize( lines )
         trainingDataset.serialize( lines )
         lines.append( "#LearningModel" )
-        parms1 = self.parms.update( { "layers": Layers.serialize(self.layers) } )
-        Parser.sparms( lines, parms1 )
+        self.parms.update( { "layers": Layers.serialize(self.layers) } )
+        Parser.sparms( lines, self.parms )
         result.serialize( lines )
         outputFile = inputDataset.getName() + "_" + str(datetime.now()).replace(" ","_")
         outputPath = os.path.join( RESULTS_DIR, outputFile )
@@ -254,16 +253,12 @@ class LearningModel:
     def createSequentialModel( self ):
         # type: () -> Sequential
         model = Sequential()
-        nOutputs = self.outputs.getOutputSize()
         nInputs = self.inputs.getInputDimension()
 
-        for layer in self.layers:
-            if hIndex == 0:
-                model.add(Dense(units=self.hidden[hIndex], activation=self.activation, input_dim=nInputs))
-            else:
-                model.add(Dense(units=self.hidden[hIndex], activation=self.activation))
-        output_layer = Dense(units=nOutputs) if nHidden else Dense(units=nOutputs, input_dim=nInputs)
-        model.add( output_layer )
+        for iLayer, layer in enumerate(self.layers):
+            kwargs = { "input_dim": nInputs } if iLayer == 0 else {}
+            model.add( layer.instance(**kwargs) )
+
         sgd = SGD( lr=self.lr, decay=self.decay, momentum=self.momentum, nesterov=self.nesterov )
         model.compile(loss=self.lossFunction, optimizer=sgd, metrics=['accuracy'])
         if self.weights is not None: model.set_weights(self.weights)

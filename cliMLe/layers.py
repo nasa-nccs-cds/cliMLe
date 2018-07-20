@@ -8,6 +8,8 @@ import copy
 import types as python_types
 import warnings
 
+from keras.models import Sequential, Model
+from keras.layers import Dense, Activation
 from keras import backend as K
 from keras import activations
 from keras import initializers
@@ -36,11 +38,12 @@ class Layers:
 class Layer:
 
     def __init__(self, _type, _dim, **kwargs):
-        self.parms = kwargs
-        self.type = _type
+        self.type = _type.lower()
         self.dim = int( _dim )
-        self.trainable = bool( kwargs.get("trainable",True) )
         self.activation = kwargs.get("activation", None)
+        self.parms = kwargs
+        try: del self.parms["activation"]
+        except: pass
 
     def serialize(self):
         return "|".join([self.type,str(self.dim),Parser.sdict(self.parms)])
@@ -49,6 +52,15 @@ class Layer:
     def deserialize( spec ):
         toks = spec.split("|")
         return Layer( toks[0], toks[1], **Parser.rdict(toks[2:]) )
+
+    def instance(self, **kwargs):
+        self.parms.update(kwargs)
+        if self.type == "dense":
+            return Dense( units=self.dim, activation=self.activation, **self.parms )
+        elif self.type == "solu":
+            return SOLU( units=self.dim, activation=self.activation, **self.parms )
+        else:
+            raise Exception( "Unrecognized layer type: " + self.type )
 
 class SOLU(TLayer):
     """Second order densely-connected NN layer.
@@ -144,12 +156,17 @@ class SOLU(TLayer):
 
     def build(self, input_shape):
         assert len(input_shape) == 2
-        input_dim = input_shape[1]
-        weights_dim = input_dim * ( input_dim + 1 )
+        input_dim_1 = input_shape[1]
+        input_dim_2 =  input_dim_1 * input_dim_1
 
-        self.kernel = self.add_weight(shape=(weights_dim, self.units),
+        self.kernel1 = self.add_weight(shape=(input_dim_1, self.units),
                                       initializer=self.kernel_initializer,
-                                      name='kernel',
+                                      name='kernel1',
+                                      regularizer=self.kernel_regularizer,
+                                      constraint=self.kernel_constraint)
+        self.kernel2 = self.add_weight(shape=(input_dim_2, self.units),
+                                      initializer=self.kernel_initializer,
+                                      name='kernel2',
                                       regularizer=self.kernel_regularizer,
                                       constraint=self.kernel_constraint)
         if self.use_bias:
@@ -160,17 +177,21 @@ class SOLU(TLayer):
                                         constraint=self.bias_constraint)
         else:
             self.bias = None
-        self.input_spec = InputSpec(min_ndim=2, axes={-1: input_dim})
+        self.input_spec = InputSpec(min_ndim=2, axes={-1: input_dim_1})
         self.built = True
 
     def o2( self, inputs ):
         # type: (Tensor) -> Tensor
-        inputs2 = tf.reshape( K.dot( inputs, K.transpose( inputs ) ), [-1] )
-        result =  tf.concat( [inputs, inputs2], 0 )
-        return result
+
+        inputs2 = K.dot(  inputs, K.transpose( inputs ) )
+        return tf.reshape( inputs2, [1,-1] )
 
     def call(self, inputs):
-        output = K.dot( self.o2(inputs), self.kernel)
+        # type: (tf.Tensor) -> tf.Tensor
+        output1 = K.dot( inputs, self.kernel1 )
+        inputs2 = self.o2(inputs)
+        output2 = K.dot( inputs2, self.kernel2 )
+        output = K.add( output1, output2 )
         if self.use_bias:
             output = K.bias_add(output, self.bias)
         if self.activation is not None:

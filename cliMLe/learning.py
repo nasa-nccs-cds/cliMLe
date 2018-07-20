@@ -2,7 +2,7 @@ from keras.models import Sequential, Model
 from keras.layers import Dense, Activation
 from typing import Optional, Any
 
-from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
+from cliMLe.layers import Layer, Layers
 from cliMLe.inputData import InputDataset
 from cliMLe.trainingData import *
 import time, keras
@@ -117,7 +117,7 @@ class FitResult:
 
 class LearningModel:
 
-    def __init__( self, inputDataset, trainingDataset,  **kwargs ):
+    def __init__( self, inputDataset, trainingDataset, _layers, **kwargs ):
         # type: (InputDataset, TrainingDataset) -> None
         self.inputs = inputDataset                  # type: InputDataset
         self.outputs = trainingDataset              # type: TrainingDataset
@@ -126,7 +126,7 @@ class LearningModel:
         self.nEpocs = int( kwargs.get( 'epocs', 300 ) )
         self.validation_fraction = float( kwargs.get(  'vf', 0.1 ) )
         self.timeRange = kwargs.get(  'timeRange', None )
-        self.hidden = Parser.raint( kwargs.get( 'hidden', [16] ) )
+        self.layers = _layers
         self.shuffle = bool( kwargs.get('shuffle', False ) )
         self.lossFunction = kwargs.get('loss_function', 'mse' )
         self.orthoWts = bool( kwargs.get('orthoWts', False ) )
@@ -154,7 +154,7 @@ class LearningModel:
             model = self.createSequentialModel()
             initial_weights = model.get_weights()
             if self.orthoWts:
-                initial_weights[0] = Analytics.orthoModes( self.inputData, self.hidden[0] )
+                initial_weights[0] = Analytics.orthoModes( self.inputData, self.layers[0].dim )
                 model.set_weights( initial_weights )
             history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, callbacks=[self.tensorboard], verbose=0 )  # type: History
             self.updateHistory( history, initial_weights, iterIndex, procIndex )
@@ -166,7 +166,8 @@ class LearningModel:
         inputDataset.serialize( lines )
         trainingDataset.serialize( lines )
         lines.append( "#LearningModel" )
-        Parser.sparms(lines,self.parms)
+        parms1 = self.parms.update( { "layers": Layers.serialize(self.layers) } )
+        Parser.sparms( lines, parms1 )
         result.serialize( lines )
         outputFile = inputDataset.getName() + "_" + str(datetime.now()).replace(" ","_")
         outputPath = os.path.join( RESULTS_DIR, outputFile )
@@ -180,6 +181,7 @@ class LearningModel:
     def deserialize( inputDataset, trainingDataset, lines ):
         active = False
         parms = {}
+        layers = None
         for line in lines:
             if line.startswith("#LearningModel"):
                 active = True
@@ -187,8 +189,11 @@ class LearningModel:
                 if line.startswith("#"): break
                 elif line.startswith("@P:"):
                     toks = line.split(":")[1].split("=")
-                    parms[toks[0]] = toks[1].strip()
-        return LearningModel( inputDataset, trainingDataset, **parms )
+                    if toks[0] == "layers":
+                        layers = Layers.deserialize( toks[1] )
+                    else:
+                        parms[toks[0]] = toks[1].strip()
+        return LearningModel( inputDataset, trainingDataset, layers, **parms )
 
     @classmethod
     def load( cls, path ):
@@ -249,11 +254,10 @@ class LearningModel:
     def createSequentialModel( self ):
         # type: () -> Sequential
         model = Sequential()
-        nHidden = len(self.hidden)
         nOutputs = self.outputs.getOutputSize()
         nInputs = self.inputs.getInputDimension()
 
-        for hIndex in range(nHidden):
+        for layer in self.layers:
             if hIndex == 0:
                 model.add(Dense(units=self.hidden[hIndex], activation=self.activation, input_dim=nInputs))
             else:
@@ -296,6 +300,21 @@ class LearningModel:
             plt.plot_date(self.dates, self.outputData[:,iPlot], "--", label="training data" )
             plt.legend()
             plt.show()
+
+    def animatePrediction( self, fitResult, title, **kwargs ):
+        # type: (FitResult, str) -> None
+        print "Plotting result: " + title
+        print " ---> NEpocs = {0}, val loss = {1}, training loss = {2}".format(fitResult.nEpocs, fitResult.val_loss, fitResult.train_loss )
+        model1 = self.getFittedModel(fitResult)
+        prediction1 = model1.predict( self.inputData )  # type: np.ndarray
+        targetNames = self.outputs.targetNames()
+        for iPlot in range(prediction1.shape[1]):
+            plt.title( targetNames[iPlot] + ": " + title )
+            plt.plot_date(self.dates, prediction1[:,iPlot], "-", label="prediction: fitted" )
+            plt.plot_date(self.dates, self.outputData[:,iPlot], "--", label="training data" )
+            plt.legend()
+            plt.show()
+
 
     def plotPerformance( self, fitResult, title, **kwargs ):
         # type: (FitResult, str) -> None

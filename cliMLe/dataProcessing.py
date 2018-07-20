@@ -17,6 +17,10 @@ class Parser:
             Parser.sparm( lines, item[0], item[1] )
 
     @staticmethod
+    def sdict( parms ):
+        return ",".join( [ item[0] + ":" + item[1] for item in parms.items() ] )
+
+    @staticmethod
     def sarray( lines, name, data ):
         sdata = [ str(v) for v in data ]
         lines.append( "@A:" + name + "=" + ",".join(sdata) )
@@ -45,6 +49,16 @@ class Parser:
             spec = spec.strip().strip("[]")
             return [ int(x) for x in spec.split(",")]
         else: return spec
+
+    @staticmethod
+    def rdict( spec ):
+        # type: (str) -> dict
+        rv = {}
+        for item in spec.split(","):
+            if item.find(":") >= 0:
+                toks = item.split(":")
+                rv[toks[0]] = toks[1]
+        return rv
 
     @staticmethod
     def ro( spec ):

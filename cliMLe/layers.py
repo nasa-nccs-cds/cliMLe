@@ -180,23 +180,28 @@ class SOLU(TLayer):
         self.input_spec = InputSpec(min_ndim=2, axes={-1: input_dim_1})
         self.built = True
 
-    def o2( self, inputs ):
+    def o2( self, input_vector ):
         # type: (Tensor) -> Tensor
-
-        inputs2 = K.dot(  inputs, K.transpose( inputs ) )
+        inputs2 = K.dot(   K.transpose( input_vector ), input_vector )
         return tf.reshape( inputs2, [1,-1] )
 
     def call(self, inputs):
         # type: (tf.Tensor) -> tf.Tensor
-        output1 = K.dot( inputs, self.kernel1 )
-        inputs2 = self.o2(inputs)
-        output2 = K.dot( inputs2, self.kernel2 )
-        output = K.add( output1, output2 )
-        if self.use_bias:
-            output = K.bias_add(output, self.bias)
-        if self.activation is not None:
-            output = self.activation(output)
-        return output
+        input_shape = inputs.get_shape()
+        output_values = []
+        for inputIndex in range( input_shape[0] ):
+            input_vector = tf.reshape( inputs[inputIndex], [1,-1] )
+            output1 = K.dot( input_vector, self.kernel1 )
+            input_vector2 = self.o2(input_vector)
+            output2 = K.dot( input_vector2, self.kernel2 )
+            output = tf.add( output1, output2 )
+            if self.use_bias:
+                output = K.bias_add(output, self.bias)
+            if self.activation is not None:
+                output = self.activation(output)
+            output_values.append( output )
+        result = tf.concat( output_values, 0 )
+        return result
 
     def compute_output_shape(self, input_shape):
         assert input_shape and len(input_shape) >= 2

@@ -7,7 +7,7 @@ outDir = os.path.expanduser("~/results")
 
 pname = "20CRv2c"
 projectName = pname + "_EOFs"
-nModes = 8
+nModes = 32
 start_year = 1851
 end_year = 2012
 nTS = 1
@@ -22,15 +22,16 @@ pcDataset = PCDataset( projectName, [ Experiment(project,start_year,end_year,64,
 inputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
-nInterationsPerProc = 10
-batchSize = 100
+nInterationsPerProc = 20
+batchSize = 35
 nEpocs = 500
 learnRate = 0.002
 momentum=0.00
 decay=0.0
 loss_function="mse"
 nesterov=False
-validation_fraction = 0.33
+validation_fraction = 0.2
+stopCondition="minValTrain"
 hiddenLayers = [ pcDataset.getInputDimension() ]
 activation = "relu"
 plotPrediction = True
@@ -43,7 +44,7 @@ trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag )
 #ref_ts = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], ref_time_range )
 
 def learning_model_factory( weights = None ):
-    return LearningModel( inputDataset, trainingDataset, batch=batchSize, lrate=learnRate, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, hidden=hiddenLayers, activation=activation, weights=weights )
+    return LearningModel( inputDataset, trainingDataset, batch=batchSize, lrate=learnRate, stop_condition=stopCondition, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, hidden=hiddenLayers, activation=activation, weights=weights )
 
 result = LearningModel.parallel_execute( learning_model_factory, nInterationsPerProc )
 print "Got Best result, valuation loss = " + str( result.val_loss ) + " training loss = " + str( result.train_loss )
@@ -55,4 +56,5 @@ if plotPrediction:
     plot_title = "Training data with Prediction ({0}->IITM, lag {1}) {2}-{3} (loss: {4}, Epochs: {5})".format(pcDataset.getVariableIds(),prediction_lag,start_year,end_year,result.val_loss,result.nEpocs)
     learningModel.plotPrediction( result, "Monsoon Prediction with IITM" )
     learningModel.plotPerformance( result, plot_title )
+    learningModel.plotAveragePerformance(plot_title)
 

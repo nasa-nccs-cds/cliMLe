@@ -5,7 +5,7 @@ from typing import Optional, Any
 from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
 from cliMLe.inputData import InputDataset
 from cliMLe.trainingData import *
-import time, keras
+import time, keras, copy
 from datetime import datetime
 from keras.callbacks import TensorBoard, History
 import tensorflow as tf
@@ -115,6 +115,45 @@ class FitResult:
                     bestResult = result
         return bestResult
 
+class PerformanceTracker:
+    def __init__( self, _stopCond ):
+        self.stopCond = _stopCond
+        self._init()
+        self.val_loss_history = None
+        self.loss_history = None
+        self.nInters = 0
+
+    def _init(self):
+        self.minValLoss = sys.float_info.max
+        self.minTrainLoss = sys.float_info.max
+        self.nEpoc = -1
+
+    def _update(self, iEpoc, valLoss, trainLoss ):
+        if (valLoss < self.minValLoss) :
+            if (self.stopCond == "minVal") or ((self.stopCond == "minValTrain") and (trainLoss <= valLoss)):
+                self.minValLoss = valLoss
+                self.minTrainLoss = trainLoss
+                self.nEpoc = iEpoc
+
+    def processHistory(self, history ):
+        self._init()
+        self.nInters += 1
+        val_loss = np.array(history.history['val_loss'])
+        training_loss = np.array(history.history['loss'])
+        for i in xrange( len(val_loss) ):
+            vloss, tloss = val_loss[i], training_loss[i]
+            self._update( i, vloss, tloss )
+        if self.val_loss_history is None:
+            self.val_loss_history = val_loss
+        else: self.val_loss_history += val_loss
+        if self.loss_history is None:
+            self.loss_history = training_loss
+        else: self.loss_history += training_loss
+
+    def getHistory(self):
+        return ( self.loss_history/self.nInters, self.val_loss_history/self.nInters )
+
+
 class LearningModel:
 
     def __init__( self, inputDataset, trainingDataset,  **kwargs ):
@@ -132,10 +171,10 @@ class LearningModel:
         self.orthoWts = bool( kwargs.get('orthoWts', False ) )
         self.weights = Parser.ro( kwargs.get( 'weights', None ) )
         self.lr = float( kwargs.get( 'lrate', 0.01 ) )
+        self.stop_condition = kwargs.get('stop_condition', "minVal")
         self.momentum = float( kwargs.get( 'momentum', 0.0 ) )
         self.decay = float( kwargs.get( 'decay', 0.0 ) )
         self.nesterov = bool( kwargs.get( 'nesterov', False ) )
-        self.score_val_weight = float( kwargs.get( 'score_val_weight', 10.0 ) )
         self.activation = kwargs.get( 'activation', 'relu' )
         self.timestamp = datetime.now().strftime("%m-%d-%y.%H:%M:%S")
         self.projectName = self.inputs.getName()
@@ -143,9 +182,13 @@ class LearningModel:
         self.inputData = self.inputs.getEpoch()
         self.dates, self.outputData = self.outputs.getEpoch()
         self.tensorboard = TensorBoard( log_dir=self.logDir, histogram_freq=0, write_graph=True )
+        self.performanceTracker = PerformanceTracker( self.stop_condition )
         self.bestFitResult = None # type: FitResult
         self.weights_template = self.createSequentialModel().get_weights()
         if self.orthoWts: assert self.hidden[0] <= self.inputs.getInputDimension(), "Error; if using orthoWts then the number units in the first hidden layer must be no more then the input dimension({0})".format(str(self.inputs.getInputDimension()))
+
+    def getAverageHistory(self):
+        return self.performanceTracker.getHistory()
 
     def execute( self, nIterations=1, procIndex=-1 ):
         # type: () -> FitResult
@@ -267,20 +310,12 @@ class LearningModel:
 
     def updateHistory( self, history, initial_weights, iterIndex, procIndex ):
         # type: (History, list[np.ndarray], int, int) -> History
-        val_loss = history.history['val_loss']
-        training_loss = history.history['loss']
-        current_min_score_val = sys.float_info.max
-        current_min_score_index = -1
-        for i in xrange( len(val_loss) ):
-            vloss, tloss = val_loss[i], training_loss[i]
-            if vloss < current_min_score_val:
-               current_min_score_val =  vloss
-               current_min_score_index = i
-        if current_min_score_index > 0:
-            if not self.bestFitResult or ( current_min_score_val < self.bestFitResult.val_loss ):
-                self.bestFitResult = FitResult.new( history, initial_weights, training_loss[current_min_score_index], val_loss[current_min_score_index], current_min_score_index )
-            if procIndex < 0:   print "Executed iteration {0}, current loss = {1}  (NE={2}), best loss = {3} (NE={4})".format(iterIndex, current_min_score_val, current_min_score_index, self.bestFitResult.val_loss, self.bestFitResult.nEpocs )
-            else:               logging.info( "PROC[{0}]: Iteration {1}, val_loss = {2}, val_loss index = {3}, min val_loss = {4}".format( procIndex, iterIndex, current_min_score_val, current_min_score_index, self.bestFitResult.val_loss ) )
+        self.performanceTracker.processHistory(history)
+        if self.performanceTracker.nEpoc > 0:
+            if not self.bestFitResult or ( self.performanceTracker.minValLoss < self.bestFitResult.val_loss ):
+                self.bestFitResult = FitResult.new( history, initial_weights, self.performanceTracker.minTrainLoss, self.performanceTracker.minValLoss, self.performanceTracker.nEpoc )
+            if procIndex < 0:   print "Executed iteration {0}, current loss = {1}  (NE={2}), best loss = {3} (NE={4})".format(iterIndex, self.performanceTracker.minValLoss, self.performanceTracker.nEpoc, self.bestFitResult.val_loss, self.bestFitResult.nEpocs )
+            else:               logging.info( "PROC[{0}]: Iteration {1}, val_loss = {2}, val_loss index = {3}, min val_loss = {4}".format( procIndex, iterIndex, self.performanceTracker.minValLoss, self.performanceTracker.nEpoc, self.bestFitResult.val_loss ) )
         return history
 
     def plotPrediction( self, fitResult, title, **kwargs ):
@@ -301,6 +336,17 @@ class LearningModel:
         # type: (FitResult, str) -> None
         valLossHistory = fitResult.valLossHistory()
         trainLossHistory = fitResult.lossHistory()
+        plt.title(title)
+        print "Plotting result: " + title
+        x = range( len(valLossHistory) )
+        plt.plot( x, valLossHistory, "--", label="Validation Loss" )
+        plt.plot( x, trainLossHistory, "--", label="Training Loss" )
+        plt.legend()
+        plt.show()
+
+    def plotAveragePerformance( self, title, **kwargs ):
+        # type: (FitResult, str) -> None
+        ( trainLossHistory, valLossHistory ) = self.performanceTracker.getHistory()
         plt.title(title)
         print "Plotting result: " + title
         x = range( len(valLossHistory) )

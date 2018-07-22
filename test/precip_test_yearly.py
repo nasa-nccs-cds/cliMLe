@@ -7,13 +7,13 @@ outDir = os.path.expanduser("~/results")
 
 pname = "20CRv2c"
 projectName = pname + "_EOFs"
-nModes = 64
+nModes = 32
 start_year = 1851
 end_year = 2012
 nTS = 1
 smooth = 0
 freq="Y"   # Yearly input/outputs
-filter="jjas"   # Filter months out of each year.
+filter="ja"   # Filter months out of each year.
 learning_range = CTimeRange.new( "1851-1-1", "2005-12-1" )
 
 variables = [ Variable("ts"), Variable( "zg", 80000 ) ]  # [ Variable("ts"), Variable( "zg", 80000 ), Variable( "zg", 50000 ), Variable( "zg", 25000 ) ]

@@ -24,7 +24,7 @@ inputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
 nInterationsPerProc = 1
-batchSize = 100
+batchSize = 65
 nEpocs = 200
 learnRate = 0.01
 momentum=0.0

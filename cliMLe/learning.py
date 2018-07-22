@@ -4,6 +4,7 @@ from typing import Optional, Any
 
 from cliMLe.layers import Layer, Layers
 from cliMLe.inputData import InputDataset
+from cliMLe.model import CustomSequentialModel
 from cliMLe.trainingData import *
 import time, keras
 from datetime import datetime
@@ -251,8 +252,8 @@ class LearningModel:
         return model
 
     def createSequentialModel( self ):
-        # type: () -> Sequential
-        model = Sequential()
+        # type: () -> CustomSequentialModel
+        model = CustomSequentialModel()
         nInputs = self.inputs.getInputDimension()
 
         for iLayer, layer in enumerate(self.layers):

@@ -1,7 +1,7 @@
 from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
 
-instance = "20CRv2c_EOFs_2018-07-20_14:07:54.998592"
+instance = "pretty_good_2"
 
 ( learningModel, result ) = LearningModel.loadInstance( instance )
 varIds = learningModel.inputs.getVariableIds()

@@ -7,7 +7,7 @@ outDir = os.path.expanduser("~/results")
 
 pname = "20CRv2c"
 projectName = pname + "_EOFs"
-nModes = 32
+nModes = 64
 start_year = 1851
 end_year = 2012
 nTS = 1
@@ -22,17 +22,17 @@ pcDataset = PCDataset( projectName, [ Experiment(project,start_year,end_year,64,
 inputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
-nInterationsPerProc = 20
-batchSize = 35
+nInterationsPerProc = 10
+batchSize = 100
 nEpocs = 500
 learnRate = 0.002
-momentum=0.00
+momentum=0.0
 decay=0.0
 loss_function="mse"
 nesterov=False
 validation_fraction = 0.2
 stopCondition="minValTrain"
-hiddenLayers = [ pcDataset.getInputDimension() ]
+hiddenLayers = [ 100 ]
 activation = "relu"
 plotPrediction = True
 orthoWts=False
@@ -56,5 +56,4 @@ if plotPrediction:
     plot_title = "Training data with Prediction ({0}->IITM, lag {1}) {2}-{3} (loss: {4}, Epochs: {5})".format(pcDataset.getVariableIds(),prediction_lag,start_year,end_year,result.val_loss,result.nEpocs)
     learningModel.plotPrediction( result, "Monsoon Prediction with IITM" )
     learningModel.plotPerformance( result, plot_title )
-    learningModel.plotAveragePerformance(plot_title)
 

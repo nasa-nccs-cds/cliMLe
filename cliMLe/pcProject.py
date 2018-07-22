@@ -33,12 +33,13 @@ class Project:
 
     def __init__(self, _dir, _name ):
         self.name = _name
-        self.directory = _dir
+        self.directory = _dir if _dir is not None else os.path.join( os.path.expanduser( "~/results" ), _name )
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
 
     @staticmethod
     def new( baseDir, name ):
+        if baseDir is None: baseDir = os.path.expanduser( "~/results" )
         directory = os.path.join( baseDir, name )
         return Project( directory, name )
 
@@ -54,13 +55,13 @@ class Experiment:
         self.id = self.project.name + '_' + str(self.start_year) + '-' + str(self.end_year) + '_M' + str(self.nModes) + "_" + self.variable.id
 
     def serialize( self, lines ):
-        lines.append( "@E:" + ",".join( [ self.project.directory, self.project.name, str(self.start_year), str(self.end_year), str(self.nModes), self.variable.varname, str(self.variable.level) ] ) )
+        lines.append( "@E:" + ",".join( [ "None", self.project.name, str(self.start_year), str(self.end_year), str(self.nModes), self.variable.varname, str(self.variable.level) ] ) )
 
     @staticmethod
     def deserialize( spec ):
         # type: (str) -> Experiment
         toks = spec.split(":")[1].split(",")
-        return Experiment( Project( toks[0], toks[1] ),  int(toks[2]), int(toks[3]), int(toks[4]), Variable( toks[5], toks[6] ) )
+        return Experiment( Project( None, toks[1] ),  int(toks[2]), int(toks[3]), int(toks[4]), Variable( toks[5], toks[6] ) )
 
     def outfilePath(self, rType ):
         # type: (int) -> str

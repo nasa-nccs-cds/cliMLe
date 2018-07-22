@@ -27,6 +27,21 @@ logging.basicConfig(filename=LOG_FILE,level=logging.DEBUG)
 class FitResult:
 
     @staticmethod
+    def getCombinedAverages( results ):
+        # type: (list[FitResult]) -> ( np.ndarray, np.ndarray, int )
+        ave_loss_sum = None
+        ave_val_loss_sum = None
+        nInstances = 0
+        for result in results:
+            ( ave_loss_history, ave_val_loss_history, nI ) = result.getAverages()
+            if ave_loss_sum is None: ave_loss_sum = ave_loss_history * nI
+            else: ave_loss_sum += ave_loss_history * nI
+            if ave_val_loss_sum is None: ave_val_loss_sum = ave_val_loss_history * nI
+            else: ave_val_loss_sum += ave_val_loss_history * nI
+            nInstances += nI
+        return ( ave_loss_sum / nInstances, ave_val_loss_sum / nInstances, nInstances )
+
+    @staticmethod
     def new( history, initial_weights, training_loss, val_loss,  nEpocs ):
         # type: (History, list[np.ndarray], float, int) -> FitResult
         return FitResult( history.history['val_loss'], history.history['loss'], initial_weights, history.model.get_weights(),  training_loss, val_loss, nEpocs )
@@ -39,6 +54,24 @@ class FitResult:
         self.val_loss = float( _val_loss )
         self.train_loss = float( _training_loss )
         self.nEpocs = int( _nEpocs )
+        self.ave_train_loss_history = None
+        self.ave_val_loss_history = None
+        self.nInstances = -1
+
+    def getAverages(self):
+        return (self.ave_train_loss_history, self.ave_val_loss_history, self.nInstances)
+
+    def recordPerformance( self, performanceTracker ):
+        # type: (PerformanceTracker) -> FitResult
+        (self.ave_train_loss_history, self.ave_val_loss_history) = performanceTracker.getHistory()
+        self.nInstances = performanceTracker.nIters
+        return self
+
+    def setPerformance( self, results ):
+        # type: (list[FitResult]) -> FitResult
+        (self.ave_train_loss_history, self.ave_val_loss_history, self.nInstances) = FitResult.getCombinedAverages(results)
+        print "Setting performance averages from {0} instances".format(self.nInstances)
+        return self
 
     def getScore( self, score_val_weight ):
         return score_val_weight * self.val_loss + self.train_loss
@@ -48,8 +81,11 @@ class FitResult:
         Parser.sparm( lines, "val_loss", self.val_loss )
         Parser.sparm( lines, "train_loss", self.train_loss )
         Parser.sparm( lines, "nepocs", self.nEpocs )
+        Parser.sparm(lines, "ninstances", self.nInstances)
         Parser.sarray( lines, "val_loss_history", self.val_loss_history )
         Parser.sarray( lines, "train_loss_history", self.train_loss_history )
+        Parser.sarray(lines, "ave_train_loss_history", self.ave_train_loss_history)
+        Parser.sarray( lines, "ave_val_loss_history", self.ave_val_loss_history )
         Parser.swts( lines, "initial", self.initial_weights )
         Parser.swts( lines, "final", self.final_weights )
 
@@ -79,7 +115,11 @@ class FitResult:
                         data = [float(x) for x in wtToks[1].split(",")]
                         wts.append( np.array(data).reshape(shape) )
                     weights[toks[0]] = wts
-        return FitResult( arrays["val_loss_history"], arrays["train_loss_history"], weights["initial"], weights["final"], parms["train_loss"],  parms["val_loss"], parms["nepocs"] )
+        rv = FitResult( arrays["val_loss_history"], arrays["train_loss_history"], weights["initial"], weights["final"], parms["train_loss"],  parms["val_loss"], parms["nepocs"] )
+        rv.ave_val_loss_history = arrays.get("ave_val_loss_history",None)
+        rv.ave_train_loss_history = arrays.get("ave_train_loss_history", None)
+        rv.nInstances = parms.get("ninstances",-1)
+        return rv
 
 
     def valLossHistory(self):
@@ -106,14 +146,14 @@ class FitResult:
     @staticmethod
     def getBest( results ):
         # type: (list[FitResult]) -> FitResult
-        bestResult = None
+        bestResult = None  # type: FitResult
         for result in results:
             if isinstance(result, basestring):
                 raise Exception( "A worker raised an Exception: " + result )
             elif result and result.isMature:
                 if bestResult is None or result < bestResult:
                     bestResult = result
-        return bestResult
+        return bestResult.setPerformance( results )
 
 class PerformanceTracker:
     def __init__( self, _stopCond ):
@@ -121,7 +161,7 @@ class PerformanceTracker:
         self._init()
         self.val_loss_history = None
         self.loss_history = None
-        self.nInters = 0
+        self.nIters = 0
 
     def _init(self):
         self.minValLoss = sys.float_info.max
@@ -137,7 +177,7 @@ class PerformanceTracker:
 
     def processHistory(self, history ):
         self._init()
-        self.nInters += 1
+        self.nIters += 1
         val_loss = np.array(history.history['val_loss'])
         training_loss = np.array(history.history['loss'])
         for i in xrange( len(val_loss) ):
@@ -151,8 +191,7 @@ class PerformanceTracker:
         else: self.loss_history += training_loss
 
     def getHistory(self):
-        return ( self.loss_history/self.nInters, self.val_loss_history/self.nInters )
-
+        return (self.loss_history / self.nIters, self.val_loss_history / self.nIters)
 
 class LearningModel:
 
@@ -201,7 +240,7 @@ class LearningModel:
                 model.set_weights( initial_weights )
             history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, callbacks=[self.tensorboard], verbose=0 )  # type: History
             self.updateHistory( history, initial_weights, iterIndex, procIndex )
-        return self.bestFitResult
+        return self.bestFitResult.recordPerformance( self.performanceTracker )
 
     def serialize( self, inputDataset, trainingDataset, result ):
         # type: (InputDataset, TrainingDataset, FitResult) -> None
@@ -336,22 +375,17 @@ class LearningModel:
         # type: (FitResult, str) -> None
         valLossHistory = fitResult.valLossHistory()
         trainLossHistory = fitResult.lossHistory()
+        plotAverages = kwargs.get("ave",True)
         plt.title(title)
         print "Plotting result: " + title
         x = range( len(valLossHistory) )
-        plt.plot( x, valLossHistory, "--", label="Validation Loss" )
-        plt.plot( x, trainLossHistory, "--", label="Training Loss" )
-        plt.legend()
-        plt.show()
-
-    def plotAveragePerformance( self, title, **kwargs ):
-        # type: (FitResult, str) -> None
-        ( trainLossHistory, valLossHistory ) = self.performanceTracker.getHistory()
-        plt.title(title)
-        print "Plotting result: " + title
-        x = range( len(valLossHistory) )
-        plt.plot( x, valLossHistory, "--", label="Validation Loss" )
-        plt.plot( x, trainLossHistory, "--", label="Training Loss" )
+        plt.plot( x, valLossHistory, "r-", label="Validation Loss" )
+        plt.plot( x, trainLossHistory, "b--", label="Training Loss" )
+        if plotAverages and (fitResult.nInstances >0):
+            ( aveTrainLossHistory, aveValLossHistory, nI ) = fitResult.getAverages()
+            plt.plot( x, aveValLossHistory, "y-.", label="Average Validation Loss" )
+            plt.plot( x, aveTrainLossHistory, "y:", label="Average Training Loss" )
+            print "Plotting averages for nInstances: " + str(nI)
         plt.legend()
         plt.show()
 

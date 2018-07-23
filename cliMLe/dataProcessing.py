@@ -17,6 +17,10 @@ class Parser:
             Parser.sparm( lines, item[0], item[1] )
 
     @staticmethod
+    def sdict( parms ):
+        return ",".join( [ item[0] + ":" + str(item[1]) for item in parms.items() ] )
+
+    @staticmethod
     def sarray( lines, name, data ):
         sdata = [ str(v) for v in data ]
         lines.append( "@A:" + name + "=" + ",".join(sdata) )
@@ -47,11 +51,22 @@ class Parser:
         else: return spec
 
     @staticmethod
+    def rdict( spec ):
+        # type: (str) -> dict
+        rv = {}
+        for item in spec.split(","):
+            if item.find(":") >= 0:
+                toks = item.split(":")
+                rv[toks[0]] = toks[1]
+        return rv
+
+    @staticmethod
     def ro( spec ):
         # type: (str) -> object
         if spec is None: return None
         elif isinstance( spec, str ) and ( spec.lower() == "none" ): return None
         else: return spec
+
 
 class Analytics:
     smoothing_kernel = np.array([.13, .23, .28, .23, .13])

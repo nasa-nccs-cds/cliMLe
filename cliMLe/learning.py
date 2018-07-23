@@ -4,6 +4,7 @@ from typing import Optional, Any
 
 from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
 from cliMLe.inputData import InputDataset
+from cliMLe.layers import Layer, Layers
 from cliMLe.trainingData import *
 import time, keras, copy
 from datetime import datetime
@@ -195,16 +196,16 @@ class PerformanceTracker:
 
 class LearningModel:
 
-    def __init__( self, inputDataset, trainingDataset,  **kwargs ):
+    def __init__( self, inputDataset, trainingDataset, _layers, **kwargs ):
         # type: (InputDataset, TrainingDataset) -> None
         self.inputs = inputDataset                  # type: InputDataset
         self.outputs = trainingDataset              # type: TrainingDataset
         self.parms = kwargs
         self.batchSize = int( kwargs.get( 'batch', 50 ) )
+        self.layers = _layers
         self.nEpocs = int( kwargs.get( 'epocs', 300 ) )
         self.validation_fraction = float( kwargs.get(  'vf', 0.1 ) )
         self.timeRange = kwargs.get(  'timeRange', None )
-        self.hidden = Parser.raint( kwargs.get( 'hidden', [16] ) )
         self.shuffle = bool( kwargs.get('shuffle', False ) )
         self.lossFunction = kwargs.get('loss_function', 'mse' )
         self.orthoWts = bool( kwargs.get('orthoWts', False ) )
@@ -214,7 +215,6 @@ class LearningModel:
         self.momentum = float( kwargs.get( 'momentum', 0.0 ) )
         self.decay = float( kwargs.get( 'decay', 0.0 ) )
         self.nesterov = bool( kwargs.get( 'nesterov', False ) )
-        self.activation = kwargs.get( 'activation', 'relu' )
         self.timestamp = datetime.now().strftime("%m-%d-%y.%H:%M:%S")
         self.projectName = self.inputs.getName()
         self.logDir = os.path.expanduser("~/results/logs/{}".format( self.projectName + "_" + self.timestamp ) )
@@ -248,7 +248,8 @@ class LearningModel:
         inputDataset.serialize( lines )
         trainingDataset.serialize( lines )
         lines.append( "#LearningModel" )
-        Parser.sparms(lines,self.parms)
+        self.parms.update( { "layers": Layers.serialize(self.layers) } )
+        Parser.sparms( lines, self.parms )
         result.serialize( lines )
         outputFile = inputDataset.getName() + "_" + str(datetime.now()).replace(" ","_")
         outputPath = os.path.join( RESULTS_DIR, outputFile )
@@ -262,6 +263,7 @@ class LearningModel:
     def deserialize( inputDataset, trainingDataset, lines ):
         active = False
         parms = {}
+        layers = None
         for line in lines:
             if line.startswith("#LearningModel"):
                 active = True
@@ -269,8 +271,11 @@ class LearningModel:
                 if line.startswith("#"): break
                 elif line.startswith("@P:"):
                     toks = line.split(":")[1].split("=")
-                    parms[toks[0]] = toks[1].strip()
-        return LearningModel( inputDataset, trainingDataset, **parms )
+                    if toks[0] == "layers":
+                        layers = Layers.deserialize( toks[1] )
+                    else:
+                        parms[toks[0]] = toks[1].strip()
+        return LearningModel( inputDataset, trainingDataset, layers, **parms )
 
     @classmethod
     def load( cls, path ):
@@ -328,20 +333,34 @@ class LearningModel:
         model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, verbose=0 )  # type: History
         return model
 
+    # def createSequentialModel1( self ):
+    #     # type: () -> Sequential
+    #     model = Sequential()
+    #     nHidden = len(self.hidden)
+    #     nOutputs = self.outputs.getOutputSize()
+    #     nInputs = self.inputs.getInputDimension()
+    #
+    #     for hIndex in range(nHidden):
+    #         if hIndex == 0:
+    #             model.add(Dense(units=self.hidden[hIndex], activation=self.activation, input_dim=nInputs))
+    #         else:
+    #             model.add(Dense(units=self.hidden[hIndex], activation=self.activation))
+    #     output_layer = Dense(units=nOutputs) if nHidden else Dense(units=nOutputs, input_dim=nInputs)
+    #     model.add( output_layer )
+    #     sgd = SGD( lr=self.lr, decay=self.decay, momentum=self.momentum, nesterov=self.nesterov )
+    #     model.compile(loss=self.lossFunction, optimizer=sgd, metrics=['accuracy'])
+    #     if self.weights is not None: model.set_weights(self.weights)
+    #     return model
+
     def createSequentialModel( self ):
         # type: () -> Sequential
         model = Sequential()
-        nHidden = len(self.hidden)
-        nOutputs = self.outputs.getOutputSize()
         nInputs = self.inputs.getInputDimension()
 
-        for hIndex in range(nHidden):
-            if hIndex == 0:
-                model.add(Dense(units=self.hidden[hIndex], activation=self.activation, input_dim=nInputs))
-            else:
-                model.add(Dense(units=self.hidden[hIndex], activation=self.activation))
-        output_layer = Dense(units=nOutputs) if nHidden else Dense(units=nOutputs, input_dim=nInputs)
-        model.add( output_layer )
+        for iLayer, layer in enumerate(self.layers):
+            kwargs = { "input_dim": nInputs } if iLayer == 0 else {}
+            model.add( layer.instance(**kwargs) )
+
         sgd = SGD( lr=self.lr, decay=self.decay, momentum=self.momentum, nesterov=self.nesterov )
         model.compile(loss=self.lossFunction, optimizer=sgd, metrics=['accuracy'])
         if self.weights is not None: model.set_weights(self.weights)

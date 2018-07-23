@@ -23,7 +23,7 @@ pcDataset = PCDataset( projectName, [ Experiment(project,start_year,end_year,64,
 inputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
-nInterationsPerProc = 25
+nInterationsPerProc = 20
 batchSize = 200
 nEpocs = 500
 learnRate = 0.005
@@ -33,7 +33,7 @@ loss_function="mse"
 nesterov=False
 validation_fraction = 0.2
 stopCondition="minValTrain"
-nHiddenUnits = 200
+nHiddenUnits = 100
 plotPrediction = True
 orthoWts=False
 

@@ -8,7 +8,7 @@ from cliMLe.layers import Layer, Layers
 from cliMLe.trainingData import *
 import time, keras, copy
 from datetime import datetime
-from keras.callbacks import TensorBoard, History
+from keras.callbacks import TensorBoard, History, Callback
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import multiprocessing as mp
@@ -25,22 +25,40 @@ try: os.makedirs( RESULTS_DIR )
 except: pass
 logging.basicConfig(filename=LOG_FILE,level=logging.DEBUG)
 
+
+class TerminationCallback(Callback):
+    """  Terminates fit loop upon convergence  """
+
+    def __init__(self, pTracker ):
+        # type: (PerformanceTracker) -> None
+        super(TerminationCallback,self).__init__()
+        self.perfTracker = pTracker
+
+    def on_train_begin(self, logs=None):
+        self.perfTracker.init()
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.perfTracker.update( self.model.history )
+        if self.perfTracker.stopTraining():
+            logging.info( "Stopping training at iteration: " + str( self.perfTracker.nIters ) )
+            self.model.stop_training = True
+
 class FitResult:
 
     @staticmethod
     def getCombinedAverages( results ):
         # type: (list[FitResult]) -> ( np.ndarray, np.ndarray, int )
-        ave_loss_sum = None
+        ave_train_loss_sum = None
         ave_val_loss_sum = None
         nInstances = 0
         for result in results:
             ( ave_loss_history, ave_val_loss_history, nI ) = result.getAverages()
-            if ave_loss_sum is None: ave_loss_sum = ave_loss_history * nI
-            else: ave_loss_sum += ave_loss_history * nI
-            if ave_val_loss_sum is None: ave_val_loss_sum = ave_val_loss_history * nI
-            else: ave_val_loss_sum += ave_val_loss_history * nI
+            if ave_loss_history is not None:
+                ave_train_loss_sum = Analytics.intersect_add( ave_train_loss_sum, ave_loss_history * nI )
+            if ave_val_loss_history is not None:
+                ave_val_loss_sum = Analytics.intersect_add( ave_val_loss_sum,  ave_val_loss_history * nI )
             nInstances += nI
-        return ( ave_loss_sum / nInstances, ave_val_loss_sum / nInstances, nInstances )
+        return (None,None,nInstances) if ave_train_loss_sum is None else ( ave_train_loss_sum / nInstances, ave_val_loss_sum / nInstances, nInstances )
 
     @staticmethod
     def new( history, initial_weights, training_loss, val_loss,  nEpocs ):
@@ -48,8 +66,8 @@ class FitResult:
         return FitResult( history.history['val_loss'], history.history['loss'], initial_weights, history.model.get_weights(),  training_loss, val_loss, nEpocs )
 
     def __init__( self, _val_loss_history, _train_loss_history, _initial_weights, _final_weights, _training_loss,  _val_loss, _nEpocs ):
-        self.val_loss_history = _val_loss_history
-        self.train_loss_history = _train_loss_history
+        self.val_loss_history = np.array( _val_loss_history )
+        self.train_loss_history = np.array( _train_loss_history )
         self.initial_weights = _initial_weights
         self.final_weights = _final_weights
         self.val_loss = float( _val_loss )
@@ -157,46 +175,61 @@ class FitResult:
         return bestResult.setPerformance( results )
 
 class PerformanceTracker:
-    def __init__( self, _stopCond ):
+    def __init__( self, _stopCond, **kwargs ):
         self.stopCond = _stopCond
-        self._init()
+        self.init()
         self.val_loss_history = None
-        self.loss_history = None
+        self.training_loss_history = None
         self.nIters = 0
+        self.nSteps = 0
+        self.nUphillIters = -1
+        self.termIters = kwargs.get('term_iters', -1 )
 
-    def _init(self):
+    def init(self):
         self.minValLoss = sys.float_info.max
         self.minTrainLoss = sys.float_info.max
-        self.nEpoc = -1
+        self.nSteps = 0
+        self.nUphillIters = -1
 
-    def _update(self, iEpoc, valLoss, trainLoss ):
+    def hasTermination(self):
+        return self.termIters > 0
+
+    def stopTraining(self):
+        rv = self.hasTermination() and ( self.nUphillIters >= self.termIters )
+        return rv
+
+    def _processIter(self, valLoss, trainLoss ):
+        self.nSteps += 1
         if (valLoss < self.minValLoss) :
             if (self.stopCond == "minVal") or ((self.stopCond == "minValTrain") and (trainLoss <= valLoss)):
                 self.minValLoss = valLoss
                 self.minTrainLoss = trainLoss
-                self.nEpoc = iEpoc
+                self.nEpoc = self.nSteps
+                self.nUphillIters = 0
+        elif self.nUphillIters >= 0:
+            self.nUphillIters += 1
+
+    def update(self, history ):
+        # type: (History) -> None
+        val_loss = history.history.get('val_loss',None)
+        training_loss = history.history.get('loss',None)
+        if val_loss and training_loss:
+            vloss, tloss = val_loss[-1], training_loss[-1]
+            self._processIter( vloss, tloss )
 
     def processHistory(self, history ):
-        self._init()
         self.nIters += 1
         val_loss = np.array(history.history['val_loss'])
         training_loss = np.array(history.history['loss'])
-        for i in xrange( len(val_loss) ):
-            vloss, tloss = val_loss[i], training_loss[i]
-            self._update( i, vloss, tloss )
-        if self.val_loss_history is None:
-            self.val_loss_history = val_loss
-        else: self.val_loss_history += val_loss
-        if self.loss_history is None:
-            self.loss_history = training_loss
-        else: self.loss_history += training_loss
+        self.val_loss_history = Analytics.intersect_add( self.val_loss_history, val_loss )
+        self.training_loss_history = Analytics.intersect_add(self.training_loss_history, training_loss)
 
     def getHistory(self):
-        return (self.loss_history / self.nIters, self.val_loss_history / self.nIters)
+        return (self.training_loss_history / self.nIters, self.val_loss_history / self.nIters)
 
 class LearningModel:
 
-    def __init__( self, inputDataset, trainingDataset, _layers, **kwargs ):
+    def __init__( self, inputDataset, trainingDataset, _layers=None, **kwargs ):
         # type: (InputDataset, TrainingDataset) -> None
         self.inputs = inputDataset                  # type: InputDataset
         self.outputs = trainingDataset              # type: TrainingDataset
@@ -206,6 +239,8 @@ class LearningModel:
         self.nEpocs = int( kwargs.get( 'epocs', 300 ) )
         self.validation_fraction = float( kwargs.get(  'vf', 0.1 ) )
         self.timeRange = kwargs.get(  'timeRange', None )
+        self.hidden = Parser.raint( kwargs.get( 'hidden', None ) )
+        self.activation = kwargs.get( 'activation', 'relu' )
         self.shuffle = bool( kwargs.get('shuffle', False ) )
         self.lossFunction = kwargs.get('loss_function', 'mse' )
         self.orthoWts = bool( kwargs.get('orthoWts', False ) )
@@ -221,24 +256,22 @@ class LearningModel:
         self.inputData = self.inputs.getEpoch()
         self.dates, self.outputData = self.outputs.getEpoch()
         self.tensorboard = TensorBoard( log_dir=self.logDir, histogram_freq=0, write_graph=True )
-        self.performanceTracker = PerformanceTracker( self.stop_condition )
+        self.performanceTracker = PerformanceTracker( self.stop_condition, **kwargs )
+        self.termCallback = TerminationCallback( self.performanceTracker )
         self.bestFitResult = None # type: FitResult
         self.weights_template = self.createSequentialModel().get_weights()
         if self.orthoWts: assert self.hidden[0] <= self.inputs.getInputDimension(), "Error; if using orthoWts then the number units in the first hidden layer must be no more then the input dimension({0})".format(str(self.inputs.getInputDimension()))
-
-    def getAverageHistory(self):
-        return self.performanceTracker.getHistory()
 
     def execute( self, nIterations=1, procIndex=-1 ):
         # type: () -> FitResult
         self.reseed()
         for iterIndex in range(nIterations):
-            model = self.createSequentialModel()
+            model = self.createSequentialModel()  # type: Sequential
             initial_weights = model.get_weights()
             if self.orthoWts:
                 initial_weights[0] = Analytics.orthoModes( self.inputData, self.hidden[0] )
                 model.set_weights( initial_weights )
-            history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, callbacks=[self.tensorboard], verbose=0 )  # type: History
+            history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, callbacks=[self.tensorboard,self.termCallback], verbose=0 )  # type: History
             self.updateHistory( history, initial_weights, iterIndex, procIndex )
         return self.bestFitResult.recordPerformance( self.performanceTracker )
 
@@ -357,9 +390,21 @@ class LearningModel:
         model = Sequential()
         nInputs = self.inputs.getInputDimension()
 
-        for iLayer, layer in enumerate(self.layers):
-            kwargs = { "input_dim": nInputs } if iLayer == 0 else {}
-            model.add( layer.instance(**kwargs) )
+        if self.layers is not None:
+            for iLayer, layer in enumerate(self.layers):
+                kwargs = { "input_dim": nInputs } if iLayer == 0 else {}
+                model.add( layer.instance(**kwargs) )
+
+        elif self.hidden is not None:
+            nHidden = len(self.hidden)
+            nOutputs = self.outputs.getOutputSize()
+            for hIndex in range(nHidden):
+                if hIndex == 0:
+                    model.add(Dense(units=self.hidden[hIndex], activation=self.activation, input_dim=nInputs))
+                else:
+                    model.add(Dense(units=self.hidden[hIndex], activation=self.activation))
+            output_layer = Dense(units=nOutputs) if nHidden else Dense(units=nOutputs, input_dim=nInputs)
+            model.add( output_layer )
 
         sgd = SGD( lr=self.lr, decay=self.decay, momentum=self.momentum, nesterov=self.nesterov )
         model.compile(loss=self.lossFunction, optimizer=sgd, metrics=['accuracy'])
@@ -397,13 +442,17 @@ class LearningModel:
         plotAverages = kwargs.get("ave",True)
         plt.title(title)
         print "Plotting result: " + title
-        x = range( len(valLossHistory) )
+        x = range( valLossHistory.shape[0] )
         plt.plot( x, valLossHistory, "r-", label="Validation Loss" )
         plt.plot( x, trainLossHistory, "b--", label="Training Loss" )
         if plotAverages and (fitResult.nInstances >0):
             ( aveTrainLossHistory, aveValLossHistory, nI ) = fitResult.getAverages()
-            plt.plot( x, aveValLossHistory, "y-.", label="Average Validation Loss" )
-            plt.plot( x, aveTrainLossHistory, "y:", label="Average Training Loss" )
+            if aveValLossHistory is not None:
+                len1 = aveValLossHistory.shape[0]
+                plt.plot( x[0:len1], aveValLossHistory, "y-.", label="Average Validation Loss" )
+            if aveTrainLossHistory is not None:
+                len1 = aveTrainLossHistory.shape[0]
+                plt.plot( x[0:len1], aveTrainLossHistory, "y:", label="Average Training Loss" )
             print "Plotting averages for nInstances: " + str(nI)
         plt.legend()
         plt.show()
@@ -432,6 +481,7 @@ class LearningModel:
     @classmethod
     def parallel_execute(cls, learning_model_factory, nIterPerProc, nProc=mp.cpu_count() ):
         # type: ( object(), int, int) -> FitResult
+        t0 = time.time()
         results = []
         learning_processes = []
         try:
@@ -456,5 +506,7 @@ class LearningModel:
         except KeyboardInterrupt:
             cls.terminate( learning_processes )
 
-        return FitResult.getBest( results )
+        result = FitResult.getBest( results )
+        print "Got Best result, valuation loss = " + str( result.val_loss ) + " training loss = " + str( result.train_loss ) + " in time " + str( time.time() - t0 ) + " secs"
+        return result
 

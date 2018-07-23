@@ -23,16 +23,17 @@ pcDataset = PCDataset( projectName, [ Experiment(project,start_year,end_year,64,
 inputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
-nInterationsPerProc = 20
+nInterationsPerProc = 10
 batchSize = 200
 nEpocs = 500
-learnRate = 0.005
+learnRate = 0.01
 momentum=0.0
 decay=0.0
 loss_function="mse"
 nesterov=False
 validation_fraction = 0.2
 stopCondition="minValTrain"
+termIters=10
 nHiddenUnits = 100
 plotPrediction = True
 orthoWts=False
@@ -46,10 +47,9 @@ trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag )
 layers = [ Layer( "dense", nHiddenUnits, activation = "relu" ), Layer( "dense", trainingDataset.getOutputSize() ) ]
 
 def learning_model_factory( weights = None ):
-    return LearningModel( inputDataset, trainingDataset, layers, batch=batchSize, lrate=learnRate, stop_condition=stopCondition, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
+    return LearningModel( inputDataset, trainingDataset, layers, batch=batchSize, lrate=learnRate, term_iters = termIters, stop_condition=stopCondition, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
 
 result = LearningModel.parallel_execute( learning_model_factory, nInterationsPerProc )
-print "Got Best result, valuation loss = " + str( result.val_loss ) + " training loss = " + str( result.train_loss )
 
 learningModel = learning_model_factory()
 learningModel.serialize( inputDataset, trainingDataset, result )

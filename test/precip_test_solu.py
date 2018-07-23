@@ -3,6 +3,7 @@ from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
 from cliMLe.dataProcessing import CTimeRange, CDuration
 from cliMLe.inputData import CDMSInputSource, InputDataset
+from cliMLe.layers import Layer, Layers
 outDir = os.path.expanduser("~/results")
 
 pname = "20CRv2c"
@@ -22,7 +23,7 @@ pcDataset = PCDataset( projectName, [ Experiment(project,start_year,end_year,64,
 inputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
-nInterationsPerProc = 20
+nInterationsPerProc = 10
 batchSize = 200
 nEpocs = 500
 learnRate = 0.005
@@ -32,8 +33,7 @@ loss_function="mse"
 nesterov=False
 validation_fraction = 0.2
 stopCondition="minValTrain"
-hiddenLayers = [ 200 ]
-activation = "relu"
+nHiddenUnits = 50
 plotPrediction = True
 orthoWts=False
 
@@ -43,8 +43,10 @@ trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag )
 #ref_time_range = ( "1980-1-1", "2014-12-1" )
 #ref_ts = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], ref_time_range )
 
+layers = [ Layer( "solu", nHiddenUnits ), Layer( "solu", trainingDataset.getOutputSize() ) ]
+
 def learning_model_factory( weights = None ):
-    return LearningModel( inputDataset, trainingDataset, batch=batchSize, lrate=learnRate, stop_condition=stopCondition, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, hidden=hiddenLayers, activation=activation, weights=weights )
+    return LearningModel( inputDataset, trainingDataset, layers, batch=batchSize, lrate=learnRate, stop_condition=stopCondition, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
 
 result = LearningModel.parallel_execute( learning_model_factory, nInterationsPerProc )
 print "Got Best result, valuation loss = " + str( result.val_loss ) + " training loss = " + str( result.train_loss )

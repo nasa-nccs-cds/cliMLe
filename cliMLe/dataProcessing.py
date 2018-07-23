@@ -22,8 +22,9 @@ class Parser:
 
     @staticmethod
     def sarray( lines, name, data ):
-        sdata = [ str(v) for v in data ]
-        lines.append( "@A:" + name + "=" + ",".join(sdata) )
+        if data is not None:
+            sdata = [ str(v) for v in data ]
+            lines.append( "@A:" + name + "=" + ",".join(sdata) )
 
     @staticmethod
     def swts( lines, name, weights ):
@@ -77,6 +78,14 @@ class Analytics:
         # type: (np.ndarray) -> np.ndarray
         std = np.std( data, axis )
         return data / std
+
+    @staticmethod
+    def intersect_add( data0, data1 ):
+        # type: (np.ndarray,np.ndarray) -> np.ndarray
+        if data0 is None: return data1
+        else:
+            len = min( data0.shape[0], data1.shape[0] )
+            return data0[0:len] + data1[0:len]
 
     @staticmethod
     def center( data, axis=0 ):

@@ -13,9 +13,9 @@ learning_range = CTimeRange.new( "1980-1-1", "2005-12-30" )
 
 prediction_lag = CDuration.months(6)
 nInterationsPerProc = 10
-batchSize = 100
-nEpocs = 200
-validation_fraction = 0.15
+batchSize = 200
+nEpocs = 500
+validation_fraction = 0.2
 hiddenLayers = [100]
 activation = "relu"
 plotPrediction = True

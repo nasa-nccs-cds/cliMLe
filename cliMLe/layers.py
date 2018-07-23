@@ -63,32 +63,7 @@ class Layer:
             raise Exception( "Unrecognized layer type: " + self.type )
 
 class SOLU(TLayer):
-    """Second order densely-connected NN layer.
-
-    `SOLU` implements the operation:
-    `output = activation(dot( o2(input), kernel) + bias)`
-    where `activation` is the element-wise activation function
-    passed as the `activation` argument, `kernel` is a weights matrix
-    created by the layer, o2() adds the second order interactions,
-    and `bias` is a bias vector created by the layer
-    (only applicable if `use_bias` is `True`).
-
-    Note: if the input to the layer has a rank greater than 2, then
-    it is flattened prior to the initial dot product with `kernel`.
-
-    # Example
-
-    ```python
-        # as first layer in a sequential model:
-        model = Sequential()
-        model.add(SOLU(32, input_shape=(16,)))
-        # now the model will take as input arrays of shape (*, 16)
-        # and output arrays of shape (*, 32)
-
-        # after the first layer, you don't need to specify
-        # the size of the input anymore:
-        model.add(SOLU(32))
-    ```
+    """Second Order Learning Unit:
 
     # Arguments
         units: Positive integer, dimensionality of the output space.
@@ -116,14 +91,10 @@ class SOLU(TLayer):
             (see [constraints](../constraints.md)).
 
     # Input shape
-        nD tensor with shape: `(batch_size, ..., input_dim)`.
-        The most common situation would be
-        a 2D input with shape `(batch_size, input_dim)`.
+        nD tensor with shape: `(batch_size, input_dim)`.
 
     # Output shape
-        nD tensor with shape: `(batch_size, ..., units)`.
-        For instance, for a 2D input with shape `(batch_size, input_dim)`,
-        the output would have shape `(batch_size, units)`.
+        nD tensor with shape: `(batch_size, units)`.
     """
 
     @interfaces.legacy_dense_support
@@ -156,7 +127,7 @@ class SOLU(TLayer):
 
     def build(self, input_shape):
         assert len(input_shape) == 2
-        input_dim_1 = input_shape[1]
+        input_dim_1 = input_shape[-1]
         input_dim_2 =  input_dim_1 * input_dim_1
 
         self.kernel1 = self.add_weight(shape=(input_dim_1, self.units),
@@ -203,8 +174,9 @@ class SOLU(TLayer):
         result = tf.map_fn( fn, inputs )  # type: tf.Tensor
         return tf.squeeze(result)
 
+
     def compute_output_shape(self, input_shape):
-        assert input_shape and len(input_shape) >= 2
+        assert input_shape and len(input_shape) == 2
         assert input_shape[-1]
         output_shape = list(input_shape)
         output_shape[-1] = self.units

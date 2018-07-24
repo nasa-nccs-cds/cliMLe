@@ -40,10 +40,7 @@ class Layer:
     def __init__(self, _type, _dim, **kwargs):
         self.type = _type.lower()
         self.dim = int( _dim )
-        self.activation = kwargs.get("activation", None)
         self.parms = kwargs
-        try: del self.parms["activation"]
-        except: pass
 
     def serialize(self):
         return "|".join([self.type,str(self.dim),Parser.sdict(self.parms)])
@@ -56,9 +53,9 @@ class Layer:
     def instance(self, **kwargs):
         self.parms.update(kwargs)
         if self.type == "dense":
-            return Dense( units=self.dim, activation=self.activation, **self.parms )
+            return Dense( units=self.dim, **self.parms )
         elif self.type == "solu":
-            return SOLU( units=self.dim, activation=self.activation, **self.parms )
+            return SOLU( units=self.dim, **self.parms )
         else:
             raise Exception( "Unrecognized layer type: " + self.type )
 

@@ -164,14 +164,13 @@ class PerformanceTracker(Callback):
         self.val_loss_history = None
         self.training_loss_history = None
         self.nIters = 0
-        self.nSteps = 0
-        self.nUphillIters = -1
         self.termIters = kwargs.get('earlyTermIndex', -1 )
 
     def on_train_begin(self, logs=None):
         self.minValLoss = sys.float_info.max
         self.minTrainLoss = sys.float_info.max
         self.nSteps = 0
+        self.nEpoc = 0
         self.nUphillIters = -1
 
     def on_train_end(self, logs=None):
@@ -236,7 +235,7 @@ class LearningModel:
         self.tensorboard = TensorBoard( log_dir=self.logDir, histogram_freq=0, write_graph=True )
         self.performanceTracker = PerformanceTracker( self.stop_condition, **kwargs )
         self.bestFitResult = None # type: FitResult
-        self.weights_template = self.createSequentialModel().get_weights()
+#        self.weights_template = self.createSequentialModel().get_weights()
         if self.orthoWts: assert self.hidden[0] <= self.inputs.getInputDimension(), "Error; if using orthoWts then the number units in the first hidden layer must be no more then the input dimension({0})".format(str(self.inputs.getInputDimension()))
 
     def execute( self, nIterations=1, procIndex=-1 ):
@@ -308,14 +307,14 @@ class LearningModel:
         np.random.seed(seed)
 
 
-    def getRandomWeights(self):
-        self.reseed()
-        new_weights = []
-        for wIndex in range(len(self.weights_template)):
-            wshape = self.weights_template[wIndex].shape
-            if wIndex % 2 == 1:     new_weights.append(  2 * np.random.random_sample( wshape ) - 1 )
-            else:                   new_weights.append( np.zeros( wshape, dtype=float ) )
-        return new_weights
+    # def getRandomWeights(self):
+    #     self.reseed()
+    #     new_weights = []
+    #     for wIndex in range(len(self.weights_template)):
+    #         wshape = self.weights_template[wIndex].shape
+    #         if wIndex % 2 == 1:     new_weights.append(  2 * np.random.random_sample( wshape ) - 1 )
+    #         else:                   new_weights.append( np.zeros( wshape, dtype=float ) )
+    #     return new_weights
 
     def getInitialModel(self, fitResult):
         # type: (FitResult) -> Model
@@ -342,25 +341,6 @@ class LearningModel:
         model.set_weights( fitResult.initial_weights )
         model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, verbose=0 )  # type: History
         return model
-
-    # def createSequentialModel1( self ):
-    #     # type: () -> Sequential
-    #     model = Sequential()
-    #     nHidden = len(self.hidden)
-    #     nOutputs = self.outputs.getOutputSize()
-    #     nInputs = self.inputs.getInputDimension()
-    #
-    #     for hIndex in range(nHidden):
-    #         if hIndex == 0:
-    #             model.add(Dense(units=self.hidden[hIndex], activation=self.activation, input_dim=nInputs))
-    #         else:
-    #             model.add(Dense(units=self.hidden[hIndex], activation=self.activation))
-    #     output_layer = Dense(units=nOutputs) if nHidden else Dense(units=nOutputs, input_dim=nInputs)
-    #     model.add( output_layer )
-    #     sgd = SGD( lr=self.lr, decay=self.decay, momentum=self.momentum, nesterov=self.nesterov )
-    #     model.compile(loss=self.lossFunction, optimizer=sgd, metrics=['accuracy'])
-    #     if self.weights is not None: model.set_weights(self.weights)
-    #     return model
 
     def createSequentialModel( self ):
         # type: () -> Sequential

@@ -8,13 +8,13 @@ outDir = os.path.expanduser("~/results")
 
 pname = "20CRv2c"
 projectName = pname + "_EOFs"
-nModes = 10
+nModes = 16
 start_year = 1851
 end_year = 2012
 nTS = 1
 smooth = 0
 freq="Y"   # Yearly input/outputs
-filter="ja"   # Filter months out of each year.
+filter="8"   # Filter months out of each year.
 learning_range = CTimeRange.new( "1851-1-1", "2005-12-1" )
 
 variables = [ Variable("ts"), Variable( "zg", 80000 ) ]  # [ Variable("ts"), Variable( "zg", 80000 ), Variable( "zg", 50000 ), Variable( "zg", 25000 ) ]
@@ -23,19 +23,20 @@ pcDataset = PCDataset( projectName, [ Experiment(project,start_year,end_year,64,
 inputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
-nInterationsPerProc = 10
+nInterationsPerProc = 15
 batchSize = 200
-nEpocs = 500
-learnRate = 0.01
-momentum=0.0
-decay=0.0
+nEpocs = 1000
+learnRate = 0.005
+momentum=0.9
+decay=0.002
 loss_function="mse"
 nesterov=False
 validation_fraction = 0.2
 stopCondition="minValTrain"
 earlyTermIndex=10
-nHiddenUnits = 100
+nHiddenUnits = 64
 plotPrediction = True
+initWtsMethod="lecun_normal"   # lecun_uniform glorot_normal glorot_uniform he_normal lecun_normal he_uniform
 orthoWts=False
 
 tds = [ IITMDataSource( domain, "JJAS" ) for domain in [ "AI" ] ] # [ "AI", "EPI", "NCI", "NEI", "NMI", "NWI", "SPI", "WPI"]
@@ -44,7 +45,7 @@ trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag )
 #ref_time_range = ( "1980-1-1", "2014-12-1" )
 #ref_ts = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], ref_time_range )
 
-layers = [ Layer( "dense", nHiddenUnits, activation = "relu" ), Layer( "dense", trainingDataset.getOutputSize() ) ]
+layers = [ Layer( "dense", nHiddenUnits, activation = "relu", kernel_initializer = initWtsMethod ), Layer( "dense", trainingDataset.getOutputSize(), kernel_initializer = initWtsMethod ) ]
 
 def learning_model_factory( weights = None ):
     return LearningModel( inputDataset, trainingDataset, layers, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )

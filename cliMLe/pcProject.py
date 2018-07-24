@@ -180,7 +180,8 @@ class PCDataset(InputDataSource):
                     slice = norm_data[ mIndex: mIndex + filter_len ]
                     slices.append( slice )
             batched_data = np.row_stack( slices )
-            if self.freq == "M": batched_data = batched_data.flatten()
+            if self.freq == "M":    batched_data = batched_data.flatten()
+            elif self.freq == "YA": batched_data = np.average(batched_data,1)
 
             if debug:
                 logging.info( "-------------- FILTERED DATA ------------------ " )

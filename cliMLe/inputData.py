@@ -122,12 +122,15 @@ class CDMSInputSource(InputDataSource):
                 slices = []
                 months = [ date.month for date in dates ]
                 (month_filter_start_index, filter_len) = Analytics.getMonthFilterIndices(self.filter)
-                for mIndex in range(len(months)):
+                for mIndex in range(len(
+
+                )):
                     if months[mIndex] == month_filter_start_index:
                         slice = timeseries[ mIndex: mIndex + filter_len ]
                         slices.append( slice )
                 batched_data = np.row_stack( slices )
                 if self.freq == "M": batched_data = batched_data.flatten()
+                elif self.freq == "YA": batched_data = np.average(batched_data,1)
             else:
                 batched_data = Analytics.yearlyAve( self.timeRange.startDate, "M", timeseries ) if self.freq == "Y" else timeseries
             if debug:

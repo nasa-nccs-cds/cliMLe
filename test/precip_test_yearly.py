@@ -8,7 +8,7 @@ outDir = os.path.expanduser("~/results")
 
 pname = "20CRv2c"
 projectName = pname + "_EOFs"
-nModes = 16
+nModes = 32
 start_year = 1851
 end_year = 2012
 nTS = 1

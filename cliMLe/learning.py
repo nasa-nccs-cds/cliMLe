@@ -25,8 +25,6 @@ try: os.makedirs( RESULTS_DIR )
 except: pass
 logging.basicConfig(filename=LOG_FILE,level=logging.DEBUG)
 
-
-
 class FitResult:
 
     @staticmethod
@@ -118,7 +116,9 @@ class FitResult:
                     weights[toks[0]] = wts
         rv = FitResult( arrays["val_loss_history"], arrays["train_loss_history"], weights["initial"], weights["final"], parms["train_loss"],  parms["val_loss"], parms["nepocs"] )
         rv.ave_val_loss_history = arrays.get("ave_val_loss_history",None)
+        if rv.ave_val_loss_history is not None: rv.ave_val_loss_history = np.array( rv.ave_val_loss_history )
         rv.ave_train_loss_history = arrays.get("ave_train_loss_history", None)
+        if rv.ave_train_loss_history is not None: rv.ave_train_loss_history = np.array( rv.ave_val_loss_history )
         rv.nInstances = parms.get("ninstances",-1)
         return rv
 
@@ -212,7 +212,7 @@ class LearningModel:
         self.outputs = trainingDataset              # type: TrainingDataset
         self.parms = kwargs
         self.batchSize = int( kwargs.get( 'batch', 50 ) )
-        self.layers = _layers
+        self.layers = _layers                               # type: list[Layer]
         self.nEpocs = int( kwargs.get( 'epocs', 300 ) )
         self.validation_fraction = float( kwargs.get(  'vf', 0.1 ) )
         self.timeRange = kwargs.get(  'timeRange', None )
@@ -223,7 +223,7 @@ class LearningModel:
         self.orthoWts = bool( kwargs.get('orthoWts', False ) )
         self.weights = Parser.ro( kwargs.get( 'weights', None ) )
         self.lr = float( kwargs.get( 'lrate', 0.01 ) )
-        self.stop_condition = kwargs.get('stop_condition', "minVal")
+        self.stop_condition = kwargs.get('stop_condition', "minValTrain")
         self.momentum = float( kwargs.get( 'momentum', 0.0 ) )
         self.decay = float( kwargs.get( 'decay', 0.0 ) )
         self.nesterov = bool( kwargs.get( 'nesterov', False ) )
@@ -236,7 +236,9 @@ class LearningModel:
         self.performanceTracker = PerformanceTracker( self.stop_condition, **kwargs )
         self.bestFitResult = None # type: FitResult
 #        self.weights_template = self.createSequentialModel().get_weights()
-        if self.orthoWts: assert self.hidden[0] <= self.inputs.getInputDimension(), "Error; if using orthoWts then the number units in the first hidden layer must be no more then the input dimension({0})".format(str(self.inputs.getInputDimension()))
+
+    def layerSize(self, layer_index=0 ):
+        return self.hidden[layer_index] if self.hidden is not None else self.layers[layer_index].dim
 
     def execute( self, nIterations=1, procIndex=-1 ):
         # type: () -> FitResult
@@ -245,7 +247,8 @@ class LearningModel:
             model = self.createSequentialModel()  # type: Sequential
             initial_weights = model.get_weights()
             if self.orthoWts:
-                initial_weights[0] = Analytics.orthoModes( self.inputData, self.hidden[0] )
+                orthoWts = Analytics.orthoModes( self.inputData, self.layerSize() )
+                initial_weights[0][:,0:orthoWts.shape[1]] = orthoWts
                 model.set_weights( initial_weights )
             history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, callbacks=[self.tensorboard,self.performanceTracker], verbose=0 )  # type: History
             self.updateHistory( history, initial_weights, iterIndex, procIndex )
@@ -279,7 +282,7 @@ class LearningModel:
             elif active:
                 if line.startswith("#"): break
                 elif line.startswith("@P:"):
-                    toks = line.split(":")[1].split("=")
+                    toks = line.split("P:")[1].split("=")
                     if toks[0] == "layers":
                         layers = Layers.deserialize( toks[1] )
                     else:

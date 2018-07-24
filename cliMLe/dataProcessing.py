@@ -58,7 +58,7 @@ class Parser:
         for item in spec.split(","):
             if item.find(":") >= 0:
                 toks = item.split(":")
-                rv[toks[0]] = toks[1]
+                rv[toks[0]] = toks[1].strip()
         return rv
 
     @staticmethod

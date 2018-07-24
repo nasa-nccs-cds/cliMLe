@@ -1,7 +1,7 @@
 from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
 
-instance = "tf_bset_results_1"
+instance = "tf_ja"
 
 ( learningModel, result ) = LearningModel.loadInstance( instance )
 varIds = learningModel.inputs.getVariableIds()

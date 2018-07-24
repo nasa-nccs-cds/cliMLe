@@ -48,7 +48,7 @@ class Layer:
     @staticmethod
     def deserialize( spec ):
         toks = spec.split("|")
-        return Layer( toks[0], toks[1], **Parser.rdict(toks[2:]) )
+        return Layer( toks[0], toks[1], **Parser.rdict(toks[2]) )
 
     def instance(self, **kwargs):
         self.parms.update(kwargs)

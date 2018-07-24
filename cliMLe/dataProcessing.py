@@ -82,10 +82,10 @@ class Analytics:
     @staticmethod
     def intersect_add( data0, data1 ):
         # type: (np.ndarray,np.ndarray) -> np.ndarray
+        if data1 is None: return data0
         if data0 is None: return data1
-        else:
-            len = min( data0.shape[0], data1.shape[0] )
-            return data0[0:len] + data1[0:len]
+        len = min( data0.shape[0], data1.shape[0] )
+        return data0[0:len] + data1[0:len]
 
     @staticmethod
     def center( data, axis=0 ):

@@ -26,22 +26,6 @@ except: pass
 logging.basicConfig(filename=LOG_FILE,level=logging.DEBUG)
 
 
-class TerminationCallback(Callback):
-    """  Terminates fit loop upon convergence  """
-
-    def __init__(self, pTracker ):
-        # type: (PerformanceTracker) -> None
-        super(TerminationCallback,self).__init__()
-        self.perfTracker = pTracker
-
-    def on_train_begin(self, logs=None):
-        self.perfTracker.init()
-
-    def on_epoch_end(self, epoch, logs=None):
-        self.perfTracker.update( self.model.history )
-        if self.perfTracker.stopTraining():
-            logging.info( "Stopping training at iteration: " + str( self.perfTracker.nIters ) )
-            self.model.stop_training = True
 
 class FitResult:
 
@@ -53,10 +37,8 @@ class FitResult:
         nInstances = 0
         for result in results:
             ( ave_loss_history, ave_val_loss_history, nI ) = result.getAverages()
-            if ave_loss_history is not None:
-                ave_train_loss_sum = Analytics.intersect_add( ave_train_loss_sum, ave_loss_history * nI )
-            if ave_val_loss_history is not None:
-                ave_val_loss_sum = Analytics.intersect_add( ave_val_loss_sum,  ave_val_loss_history * nI )
+            ave_train_loss_sum = Analytics.intersect_add( ave_train_loss_sum, ave_loss_history * nI )
+            ave_val_loss_sum =  Analytics.intersect_add(  ave_val_loss_sum,   ave_val_loss_history * nI )
             nInstances += nI
         return (None,None,nInstances) if ave_train_loss_sum is None else ( ave_train_loss_sum / nInstances, ave_val_loss_sum / nInstances, nInstances )
 
@@ -174,29 +156,40 @@ class FitResult:
                     bestResult = result
         return bestResult.setPerformance( results )
 
-class PerformanceTracker:
+
+class PerformanceTracker(Callback):
     def __init__( self, _stopCond, **kwargs ):
+        super(PerformanceTracker,self).__init__()
         self.stopCond = _stopCond
-        self.init()
         self.val_loss_history = None
         self.training_loss_history = None
         self.nIters = 0
         self.nSteps = 0
         self.nUphillIters = -1
-        self.termIters = kwargs.get('term_iters', -1 )
+        self.termIters = kwargs.get('earlyTermIndex', -1 )
 
-    def init(self):
+    def on_train_begin(self, logs=None):
         self.minValLoss = sys.float_info.max
         self.minTrainLoss = sys.float_info.max
         self.nSteps = 0
         self.nUphillIters = -1
 
-    def hasTermination(self):
-        return self.termIters > 0
+    def on_train_end(self, logs=None):
+        self.nIters += 1
+        val_loss = np.array(self.model.history.history['val_loss'])
+        training_loss = np.array(self.model.history.history['loss'])
+        self.val_loss_history = Analytics.intersect_add( self.val_loss_history, val_loss )
+        self.training_loss_history = Analytics.intersect_add(self.training_loss_history, training_loss)
 
-    def stopTraining(self):
-        rv = self.hasTermination() and ( self.nUphillIters >= self.termIters )
-        return rv
+    def on_epoch_end(self, epoch, logs=None):
+        val_loss = self.model.history.history.get('val_loss',None)
+        training_loss = self.model.history.history.get('loss',None)
+        if val_loss and training_loss:
+            vloss, tloss = val_loss[-1], training_loss[-1]
+            self._processIter( vloss, tloss )
+        if ( self.termIters > 0 ) and ( self.nUphillIters >= self.termIters ):
+            logging.info( "Stopping training at iteration: " + str( self.nIters ) )
+            self.model.stop_training = True
 
     def _processIter(self, valLoss, trainLoss ):
         self.nSteps += 1
@@ -208,21 +201,6 @@ class PerformanceTracker:
                 self.nUphillIters = 0
         elif self.nUphillIters >= 0:
             self.nUphillIters += 1
-
-    def update(self, history ):
-        # type: (History) -> None
-        val_loss = history.history.get('val_loss',None)
-        training_loss = history.history.get('loss',None)
-        if val_loss and training_loss:
-            vloss, tloss = val_loss[-1], training_loss[-1]
-            self._processIter( vloss, tloss )
-
-    def processHistory(self, history ):
-        self.nIters += 1
-        val_loss = np.array(history.history['val_loss'])
-        training_loss = np.array(history.history['loss'])
-        self.val_loss_history = Analytics.intersect_add( self.val_loss_history, val_loss )
-        self.training_loss_history = Analytics.intersect_add(self.training_loss_history, training_loss)
 
     def getHistory(self):
         return (self.training_loss_history / self.nIters, self.val_loss_history / self.nIters)
@@ -257,7 +235,6 @@ class LearningModel:
         self.dates, self.outputData = self.outputs.getEpoch()
         self.tensorboard = TensorBoard( log_dir=self.logDir, histogram_freq=0, write_graph=True )
         self.performanceTracker = PerformanceTracker( self.stop_condition, **kwargs )
-        self.termCallback = TerminationCallback( self.performanceTracker )
         self.bestFitResult = None # type: FitResult
         self.weights_template = self.createSequentialModel().get_weights()
         if self.orthoWts: assert self.hidden[0] <= self.inputs.getInputDimension(), "Error; if using orthoWts then the number units in the first hidden layer must be no more then the input dimension({0})".format(str(self.inputs.getInputDimension()))
@@ -271,7 +248,7 @@ class LearningModel:
             if self.orthoWts:
                 initial_weights[0] = Analytics.orthoModes( self.inputData, self.hidden[0] )
                 model.set_weights( initial_weights )
-            history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, callbacks=[self.tensorboard,self.termCallback], verbose=0 )  # type: History
+            history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, callbacks=[self.tensorboard,self.performanceTracker], verbose=0 )  # type: History
             self.updateHistory( history, initial_weights, iterIndex, procIndex )
         return self.bestFitResult.recordPerformance( self.performanceTracker )
 
@@ -413,7 +390,6 @@ class LearningModel:
 
     def updateHistory( self, history, initial_weights, iterIndex, procIndex ):
         # type: (History, list[np.ndarray], int, int) -> History
-        self.performanceTracker.processHistory(history)
         if self.performanceTracker.nEpoc > 0:
             if not self.bestFitResult or ( self.performanceTracker.minValLoss < self.bestFitResult.val_loss ):
                 self.bestFitResult = FitResult.new( history, initial_weights, self.performanceTracker.minTrainLoss, self.performanceTracker.minValLoss, self.performanceTracker.nEpoc )

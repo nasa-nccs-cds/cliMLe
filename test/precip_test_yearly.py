@@ -33,7 +33,7 @@ loss_function="mse"
 nesterov=False
 validation_fraction = 0.2
 stopCondition="minValTrain"
-termIters=10
+earlyTermIndex=10
 nHiddenUnits = 100
 plotPrediction = True
 orthoWts=False
@@ -47,7 +47,7 @@ trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag )
 layers = [ Layer( "dense", nHiddenUnits, activation = "relu" ), Layer( "dense", trainingDataset.getOutputSize() ) ]
 
 def learning_model_factory( weights = None ):
-    return LearningModel( inputDataset, trainingDataset, layers, batch=batchSize, lrate=learnRate, term_iters = termIters, stop_condition=stopCondition, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
+    return LearningModel( inputDataset, trainingDataset, layers, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
 
 result = LearningModel.parallel_execute( learning_model_factory, nInterationsPerProc )
 

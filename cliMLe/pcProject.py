@@ -28,11 +28,11 @@ class Variable:
             else: return int( spec )
         else: return spec
 
-
 class Project:
 
     def __init__(self, _dir, _name ):
         self.name = _name
+        self.exts = { PC: '-PCs.nc', EOF: '-EOFs.nc' }
         self.directory = _dir if _dir is not None else os.path.join( os.path.expanduser( "~/results" ), _name )
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
@@ -42,6 +42,10 @@ class Project:
         if baseDir is None: baseDir = os.path.expanduser( "~/results" )
         directory = os.path.join( baseDir, name )
         return Project( directory, name )
+
+    def outfilePath(self, experiment, rType ):
+        # type: (str, int) -> str
+        return os.path.join( self.directory, experiment + self.exts.get( rType, "Invalid response type: " + str(rType) ) )
 
 class Experiment:
 

@@ -41,9 +41,9 @@ class FitResult:
         return (None,None,nInstances) if ave_train_loss_sum is None else ( ave_train_loss_sum / nInstances, ave_val_loss_sum / nInstances, nInstances )
 
     @staticmethod
-    def new( history, initial_weights, training_loss, val_loss,  nEpocs ):
+    def new( history, initial_weights, final_weights, training_loss, val_loss,  nEpocs ):
         # type: (History, list[np.ndarray], float, int) -> FitResult
-        return FitResult( history.history['val_loss'], history.history['loss'], initial_weights, history.model.get_weights(),  training_loss, val_loss, nEpocs )
+        return FitResult( history.history['val_loss'], history.history['loss'], initial_weights, final_weights,  training_loss, val_loss, nEpocs )
 
     def __init__( self, _val_loss_history, _train_loss_history, _initial_weights, _final_weights, _training_loss,  _val_loss, _nEpocs ):
         self.val_loss_history = np.array( _val_loss_history )
@@ -173,6 +173,7 @@ class PerformanceTracker(Callback):
         self.minTrainLoss = sys.float_info.max
         self.nSteps = 0
         self.nEpoc = 0
+        self.best_weights = None
         self.nUphillIters = -1
 
     def on_train_end(self, logs=None):
@@ -200,11 +201,15 @@ class PerformanceTracker(Callback):
                 self.minTrainLoss = trainLoss
                 self.nEpoc = self.nSteps
                 self.nUphillIters = 0
+                self.best_weights = copy.deepcopy(self.model.get_weights())
         elif self.nUphillIters >= 0:
             self.nUphillIters += 1
 
     def getHistory(self):
         return (self.training_loss_history / self.nIters, self.val_loss_history / self.nIters)
+
+    def getWeights(self):
+        return self.best_weights
 
 class LearningModel:
 
@@ -330,21 +335,8 @@ class LearningModel:
     def getFittedModel( self, fitResult ):
         # type: (FitResult) -> Model
         model = self.createSequentialModel()  # type: Sequential
-        model.set_weights( fitResult.initial_weights )
-        model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=fitResult.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, verbose=0 )  # type: History
-        return model
-
-    def getFinalModel( self, fitResult ):
-        # type: (FitResult) -> Model
-        model = self.createSequentialModel()
         model.set_weights( fitResult.final_weights )
-        return model
-
-    def getRerunModel( self, fitResult ):
-        # type: (FitResult) -> Model
-        model = self.createSequentialModel()
-        model.set_weights( fitResult.initial_weights )
-        model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, verbose=0 )  # type: History
+#        model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=fitResult.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, verbose=0 )  # type: History
         return model
 
     def createSequentialModel( self ):
@@ -377,7 +369,7 @@ class LearningModel:
         # type: (History, list[np.ndarray], int, int) -> History
         if self.performanceTracker.nEpoc > 0:
             if not self.bestFitResult or ( self.performanceTracker.minValLoss < self.bestFitResult.val_loss ):
-                self.bestFitResult = FitResult.new( history, initial_weights, self.performanceTracker.minTrainLoss, self.performanceTracker.minValLoss, self.performanceTracker.nEpoc )
+                self.bestFitResult = FitResult.new( history, initial_weights, self.performanceTracker.getWeights(), self.performanceTracker.minTrainLoss, self.performanceTracker.minValLoss, self.performanceTracker.nEpoc )
             if procIndex < 0:   print "Executed iteration {0}, current loss = {1}  (NE={2}), best loss = {3} (NE={4})".format(iterIndex, self.performanceTracker.minValLoss, self.performanceTracker.nEpoc, self.bestFitResult.val_loss, self.bestFitResult.nEpocs )
             else:               logging.info( "PROC[{0}]: Iteration {1}, val_loss = {2}, val_loss index = {3}, min val_loss = {4}".format( procIndex, iterIndex, self.performanceTracker.minValLoss, self.performanceTracker.nEpoc, self.bestFitResult.val_loss ) )
         return history

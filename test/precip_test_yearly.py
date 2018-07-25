@@ -6,24 +6,32 @@ from cliMLe.inputData import CDMSInputSource, InputDataset
 from cliMLe.layers import Layer, Layers
 outDir = os.path.expanduser("~/results")
 
+plotPrediction = True
+plotVerification = False
+
+trainStartDate="1851-1-1"
+trainEndDate="2005-12-1"
+verificationSplitDate= "1861-1-1"
+
 pname = "20CRv2c"
 projectName = pname + "_EOFs"
 nModes = 32
-start_year = 1851
-end_year = 2012
+proj_start_year = 1851
+proj_end_year = 2012
 nTS = 1
 smooth = 0
 freq="Y"   # Yearly input/outputs
 filter="8"   # Filter months out of each year.
-learning_range = CTimeRange.new( "1851-1-1", "2005-12-1" )
+learning_range = CTimeRange.new(verificationSplitDate, trainEndDate) if plotVerification else CTimeRange.new(trainStartDate, trainEndDate)
 
 variables = [ Variable("ts"), Variable( "zg", 80000 ) ]  # [ Variable("ts"), Variable( "zg", 80000 ), Variable( "zg", 50000 ), Variable( "zg", 25000 ) ]
 project = Project.new(outDir,projectName)
-pcDataset = PCDataset( projectName, [ Experiment(project,start_year,end_year,64,variable) for variable in variables ], nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = learning_range )
+experiments = [ Experiment(project,proj_start_year,proj_end_year,64,variable) for variable in variables ]
+pcDataset = PCDataset( projectName, experiments, nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = learning_range )
 inputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
-nInterationsPerProc = 50
+nInterationsPerProc = 20
 batchSize = 200
 nEpocs = 1000
 learnRate = 0.005
@@ -35,10 +43,10 @@ validation_fraction = 0.2
 stopCondition="minValTrain"
 earlyTermIndex=50
 shuffle=True
-nHiddenUnits = 60
-plotPrediction = True
+nHiddenUnits = 64
+
 initWtsMethod="lecun_normal"   # lecun_uniform glorot_normal glorot_uniform he_normal lecun_normal he_uniform
-orthoWts=True
+orthoWts=False
 
 tds = [ IITMDataSource( domain, "JJAS" ) for domain in [ "AI" ] ] # [ "AI", "EPI", "NCI", "NEI", "NMI", "NWI", "SPI", "WPI"]
 trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag )
@@ -48,8 +56,8 @@ trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag )
 
 layers = [ Layer( "dense", nHiddenUnits, activation = "relu", kernel_initializer = initWtsMethod ), Layer( "dense", trainingDataset.getOutputSize(), kernel_initializer = initWtsMethod ) ]
 
-def learning_model_factory( weights = None ):
-    return LearningModel( inputDataset, trainingDataset, layers, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, shuffle=shuffle, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
+def learning_model_factory( inputs=inputDataset, target=trainingDataset, weights=None ):
+    return LearningModel( inputs, target, layers, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, shuffle=shuffle, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
 
 result = LearningModel.parallel_execute( learning_model_factory, nInterationsPerProc )
 
@@ -57,7 +65,14 @@ learningModel = learning_model_factory()
 learningModel.serialize( inputDataset, trainingDataset, result )
 
 if plotPrediction:
-    plot_title = "Training data with Prediction ({0}->IITM, lag {1}) {2}-{3} (loss: {4}, Epochs: {5})".format(pcDataset.getVariableIds(),prediction_lag,start_year,end_year,result.val_loss,result.nEpocs)
+    plot_title = "Training data with Prediction ({0}->IITM, lag {1}) {2}-{3} (loss: {4}, Epochs: {5})".format(pcDataset.getVariableIds(),prediction_lag,proj_start_year,proj_end_year,result.val_loss,result.nEpocs)
     learningModel.plotPrediction( result, "Monsoon Prediction with IITM" )
     learningModel.plotPerformance( result, plot_title )
 
+if plotVerification:
+    verification_range = CTimeRange.new(trainStartDate, verificationSplitDate)
+    pcVerificationDataset = PCDataset( projectName, experiments, nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = verification_range )
+    verInputDataset = InputDataset( [ pcVerificationDataset ] )
+    verTargetDataset = TrainingDataset.new( tds, pcVerificationDataset, prediction_lag )
+    verificationModel = learning_model_factory( verInputDataset, verTargetDataset )
+    verificationModel.plotPrediction( result, "Verification" )

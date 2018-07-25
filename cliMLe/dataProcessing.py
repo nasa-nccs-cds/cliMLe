@@ -125,6 +125,7 @@ class Analytics:
         # type: (np.ndarray, int) -> np.ndarray
         eof = Eof( data, None, False, False )
         result = eof.eofs( 0, nModes )  # type: np.ndarray
+        result = result / ( np.std( result ) * math.sqrt(data.shape[1]) )
         return result.transpose()
 
     @classmethod

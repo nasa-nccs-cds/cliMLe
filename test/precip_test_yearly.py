@@ -23,7 +23,7 @@ pcDataset = PCDataset( projectName, [ Experiment(project,start_year,end_year,64,
 inputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
-nInterationsPerProc = 15
+nInterationsPerProc = 50
 batchSize = 200
 nEpocs = 1000
 learnRate = 0.005
@@ -33,11 +33,12 @@ loss_function="mse"
 nesterov=False
 validation_fraction = 0.2
 stopCondition="minValTrain"
-earlyTermIndex=10
-nHiddenUnits = 64
+earlyTermIndex=50
+shuffle=True
+nHiddenUnits = 60
 plotPrediction = True
 initWtsMethod="lecun_normal"   # lecun_uniform glorot_normal glorot_uniform he_normal lecun_normal he_uniform
-orthoWts=False
+orthoWts=True
 
 tds = [ IITMDataSource( domain, "JJAS" ) for domain in [ "AI" ] ] # [ "AI", "EPI", "NCI", "NEI", "NMI", "NWI", "SPI", "WPI"]
 trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag )
@@ -48,7 +49,7 @@ trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag )
 layers = [ Layer( "dense", nHiddenUnits, activation = "relu", kernel_initializer = initWtsMethod ), Layer( "dense", trainingDataset.getOutputSize(), kernel_initializer = initWtsMethod ) ]
 
 def learning_model_factory( weights = None ):
-    return LearningModel( inputDataset, trainingDataset, layers, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
+    return LearningModel( inputDataset, trainingDataset, layers, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, shuffle=shuffle, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
 
 result = LearningModel.parallel_execute( learning_model_factory, nInterationsPerProc )
 

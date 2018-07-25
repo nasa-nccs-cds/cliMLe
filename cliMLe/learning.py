@@ -116,9 +116,11 @@ class FitResult:
                     weights[toks[0]] = wts
         rv = FitResult( arrays["val_loss_history"], arrays["train_loss_history"], weights["initial"], weights["final"], parms["train_loss"],  parms["val_loss"], parms["nepocs"] )
         rv.ave_val_loss_history = arrays.get("ave_val_loss_history",None)
-        if rv.ave_val_loss_history is not None: rv.ave_val_loss_history = np.array( rv.ave_val_loss_history )
+        if rv.ave_val_loss_history is not None:
+            rv.ave_val_loss_history = np.array( rv.ave_val_loss_history )
         rv.ave_train_loss_history = arrays.get("ave_train_loss_history", None)
-        if rv.ave_train_loss_history is not None: rv.ave_train_loss_history = np.array( rv.ave_val_loss_history )
+        if rv.ave_train_loss_history is not None:
+            rv.ave_train_loss_history = np.array( rv.ave_val_loss_history )
         rv.nInstances = parms.get("ninstances",-1)
         return rv
 

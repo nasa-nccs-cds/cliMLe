@@ -2,7 +2,7 @@ from keras.models import Sequential, Model
 from keras.layers import Dense, Activation
 from typing import Optional, Any
 
-from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
+from cliMLe.climatele import Project, Variable, Experiment, ClimateleDataset
 from cliMLe.inputData import InputDataset
 from cliMLe.layers import Layer, Layers
 from cliMLe.trainingData import *
@@ -25,7 +25,7 @@ try: os.makedirs( RESULTS_DIR )
 except: pass
 logging.basicConfig(filename=LOG_FILE,level=logging.DEBUG)
 
-class FitResult:
+class FitResult(object):
 
     @staticmethod
     def getCombinedAverages( results ):
@@ -211,7 +211,7 @@ class PerformanceTracker(Callback):
     def getWeights(self):
         return self.best_weights
 
-class LearningModel:
+class LearningModel(object):
 
     def __init__( self, inputDataset, trainingDataset, _layers=None, **kwargs ):
         # type: (InputDataset, TrainingDataset) -> None

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-class Parser:
+class Parser(object):
 
     @staticmethod
     def sparm( lines, name, value ):
@@ -69,7 +69,7 @@ class Parser:
         else: return spec
 
 
-class Analytics:
+class Analytics(object):
     smoothing_kernel = np.array([.13, .23, .28, .23, .13])
     months = "jfmamjjasonjfmamjjason"
 
@@ -153,7 +153,7 @@ class Analytics:
     #     yearly_ave = ds.groupby('time.year').mean('time')                                               # type: xr.Dataset
     #     return yearly_ave["data"].data
 
-class CDuration:
+class CDuration(object):
 
     MONTH = "M"
     YEAR = "Y"
@@ -185,7 +185,7 @@ class CDuration:
         assert self.unit == other.unit, "Incommensurable units in CDuration sub operation"
         return CDuration(self.length - other.length, self.unit )
 
-class CDate:
+class CDate(object):
 
     def __init__(self, Year, Month, Day):
         # type: (int,int,int) -> None
@@ -216,7 +216,7 @@ class CDate:
             return CDate( new_year, new_month, self.day )
         else: raise Exception( "Illegal unit value: " + str(duration.unit) )
 
-class CTimeRange:
+class CTimeRange(object):
 
     def __init__(self, start, end ):
         # type: (CDate,CDate) -> None

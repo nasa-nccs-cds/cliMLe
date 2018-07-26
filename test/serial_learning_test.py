@@ -1,4 +1,4 @@
-from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
+from cliMLe.climatele import Project, Variable, Experiment, ClimateleDataset
 from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
 import multiprocessing as mp
@@ -25,7 +25,7 @@ plotPrediction = True
 
 variables = [ Variable("ts") ] # , Variable( "zg", 50000 ) ]
 project = Project(outDir,projectName)
-pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable) for variable in variables ], nts = nTS, smooth = smooth, timeRange = learning_range )
+pcDataset = ClimateleDataset([Experiment(project, start_year, end_year, nModes, variable) for variable in variables], nts = nTS, smooth = smooth, timeRange = learning_range)
 td = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ] ) # , "pdo_timeseries_mon", "indian_ocean_dipole", "nino34"
 trainingDataset = TrainingDataset.new( [td], pcDataset, prediction_lag )
 

@@ -1,4 +1,4 @@
-from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
+from cliMLe.climatele import Project, Variable, Experiment, ClimateleDataset
 from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
 from cliMLe.dataProcessing import CTimeRange, CDuration
@@ -27,7 +27,7 @@ learning_range = CTimeRange.new(verificationSplitDate, trainEndDate) if plotVeri
 variables = [ Variable("ts"), Variable( "zg", 80000 ) ]  # [ Variable("ts"), Variable( "zg", 80000 ), Variable( "zg", 50000 ), Variable( "zg", 25000 ) ]
 project = Project.new(outDir,projectName)
 experiments = [ Experiment(project,proj_start_year,proj_end_year,64,variable) for variable in variables ]
-pcDataset = PCDataset( projectName, experiments, nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = learning_range )
+pcDataset = ClimateleDataset(projectName, experiments, nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = learning_range)
 inputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
@@ -71,7 +71,7 @@ if plotPrediction:
 
 if plotVerification:
     verification_range = CTimeRange.new(trainStartDate, verificationSplitDate)
-    pcVerificationDataset = PCDataset( projectName, experiments, nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = verification_range )
+    pcVerificationDataset = ClimateleDataset(projectName, experiments, nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = verification_range)
     verInputDataset = InputDataset( [ pcVerificationDataset ] )
     verTargetDataset = TrainingDataset.new( tds, pcVerificationDataset, prediction_lag )
     verificationModel = learning_model_factory( verInputDataset, verTargetDataset )

@@ -22,7 +22,7 @@ from tensorflow.python.framework.ops import Tensor
 from cliMLe.dataProcessing import Parser
 import tensorflow as tf
 
-class Layers:
+class Layers(object):
 
     @staticmethod
     def serialize( layers ):
@@ -35,7 +35,7 @@ class Layers:
             return [ Layer.deserialize(x) for x in spec.split(";") ]
         else: return spec
 
-class Layer:
+class Layer(object):
 
     def __init__(self, _type, _dim, **kwargs):
         self.type = _type.lower()

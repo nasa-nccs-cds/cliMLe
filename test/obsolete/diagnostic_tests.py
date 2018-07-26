@@ -1,4 +1,4 @@
-from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
+from cliMLe.climatele import Project, Variable, Experiment, ClimateleDataset
 from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
 import multiprocessing as mp
@@ -13,7 +13,7 @@ nModes = 32
 
 variables = [ Variable("ts") ]
 project = Project(outDir,projectName)
-pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable) for variable in variables ] )
+pcDataset = ClimateleDataset([Experiment(project, start_year, end_year, nModes, variable) for variable in variables])
 
 prediction_lag = 0
 nInterationsPerProc = 10

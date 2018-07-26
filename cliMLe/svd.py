@@ -1,7 +1,6 @@
 from __future__ import (absolute_import, division, print_function)  # noqa
 import collections
 import warnings
-from cliMLe.pcProject import *
 import numpy as np
 import cdms2 as cdms
 import numpy.ma as ma
@@ -9,10 +8,9 @@ from eofs.tools.standard import correlation_map, covariance_map
 import time
 from cdutil.times import ANNUALCYCLE
 import numpy as np
+from cliMLe.project import Project, PC, EOF
 
-
-
-class EOFSolver:
+class EOFSolver(object):
 
     def __init__(self, _project, experiment, outDir ):
         self.experiment = experiment

@@ -1,4 +1,4 @@
-from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
+from cliMLe.climatele import Project, Variable, Experiment, ClimateleDataset
 from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
 from cliMLe.dataProcessing import CTimeRange, CDuration
@@ -19,7 +19,7 @@ learning_range = CTimeRange.new( "1851-1-1", "2005-12-1" )
 
 variables = [ Variable("ts"), Variable( "zg", 80000 ) ]  # [ Variable("ts"), Variable( "zg", 80000 ), Variable( "zg", 50000 ), Variable( "zg", 25000 ) ]
 project = Project.new(outDir,projectName)
-pcDataset = PCDataset( projectName, [ Experiment(project,start_year,end_year,64,variable) for variable in variables ], nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = learning_range )
+pcDataset = ClimateleDataset(projectName, [Experiment(project, start_year, end_year, 64, variable) for variable in variables], nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = learning_range)
 inputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)

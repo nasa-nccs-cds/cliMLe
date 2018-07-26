@@ -1,4 +1,4 @@
-from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
+from cliMLe.climatele import Project, Variable, Experiment, ClimateleDataset
 from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
 from cliMLe.dataProcessing import CTimeRange, CDuration
@@ -45,8 +45,6 @@ for var in variables:
     #------------------------------ READ DATA ------------------------------
 
     read_start = time.time()
-    print "Computing Eofs for variable " + var.varname + ", level = " + str(var.level) + ", nModes = " + str(nModes)
-
     if var.level:
         experiment = projectName + '_'+str(start_year)+'-'+str(end_year) + '_M' + str(nModes) + "_" + var.varname + "-" + str(var.level)
         f = cdms.open(data_path)
@@ -102,7 +100,7 @@ if plotPrediction:
 
 if plotVerification:
     verification_range = CTimeRange.new(trainStartDate, verificationSplitDate)
-    pcVerificationDataset = PCDataset( projectName, experiments, nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = verification_range )
+    pcVerificationDataset = ClimateleDataset(projectName, experiments, nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = verification_range)
     verInputDataset = InputDataset( [ pcVerificationDataset ] )
     verTargetDataset = TrainingDataset.new( tds, pcVerificationDataset, prediction_lag )
     verificationModel = learning_model_factory( verInputDataset, verTargetDataset )

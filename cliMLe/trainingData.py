@@ -6,10 +6,10 @@ from cdms2.selectors import Selector
 import matplotlib.pyplot as plt
 from cliMLe.dataProcessing import Analytics, CTimeRange, CDuration
 from typing import List, Union, Dict, Any
-from cliMLe.pcProject import PCDataset
+from cliMLe.climatele import ClimateleDataset
 from cliMLe.dataProcessing import Parser
 
-class TimeseriesData:
+class TimeseriesData(object):
 
     def __init__(self, _dates, _series ):
         # type: (list(datetime.date), list[(str,np.ndarray)]) -> None
@@ -18,7 +18,7 @@ class TimeseriesData:
         self.data = np.column_stack( self.series.values() )
         self.output_size = len( self.series.keys() )
 
-class DataSource:
+class DataSource(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, name ):
@@ -161,7 +161,7 @@ class IITMDataSource(DataSource):
         except ValueError:
             return False
 
-class TrainingDataset:
+class TrainingDataset(object):
 
     def __init__(self, sources, **kwargs ):
         # type: ( list[DataSource], CDuration ) -> None
@@ -200,7 +200,7 @@ class TrainingDataset:
 
     @classmethod
     def new(cls, sources, inputDataset, predictionLag, **kwargs):
-        # type: ( list[DataSource], PCDataset, CDuration ) -> TrainingDataset
+        # type: ( list[DataSource], ClimateleDataset, CDuration ) -> TrainingDataset
         offset = inputDataset.nTSteps - 1 if inputDataset is not None else 0
         smooth = inputDataset.smooth if inputDataset is not None else 0
         trainingRange = inputDataset.timeRange.shift(predictionLag.inc(offset))

@@ -1,6 +1,6 @@
 from keras.models import Sequential
 from keras.layers import Dense, Activation
-from cliMLe.pcProject import Project, Variable, Experiment, PCDataset
+from cliMLe.climatele import Project, Variable, Experiment, ClimateleDataset
 from cliMLe.trainingData import *
 from cliMLe.learning import FitResult
 import time, keras
@@ -17,7 +17,7 @@ end_year = 2015
 nModes = 32
 variables = [ Variable("ts") ]
 project = Project(outDir,projectName)
-pcDataset = PCDataset( [ Experiment(project,start_year,end_year,nModes,variable) for variable in variables ] )
+pcDataset = ClimateleDataset([Experiment(project, start_year, end_year, nModes, variable) for variable in variables])
 nInterations = 10
 
 batchSize = 50

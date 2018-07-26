@@ -1,9 +1,16 @@
-import abc, os, logging
+import abc, os, logging, cdtime, time
 import numpy as np
 import cdms2 as cdms
+from cdms2.selectors import Selector
+from cdms2 import level
 from cliMLe.dataProcessing import Analytics, CTimeRange, Parser
+from cliMLe.project import *
 
-class InputDataSource:
+# NONE = 0
+# BATCH = 1
+# EPOCH = 2
+
+class InputDataSource(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, _name, **kwargs ):
@@ -13,7 +20,7 @@ class InputDataSource:
        self.nTSteps = int( kwargs.get( "nts", "1" ) )
        self.smooth = int( kwargs.get( "smooth", "0" ) )
        self.decycle = bool( kwargs.get("decycle", "False" ) )
-       self.freq = kwargs.get("freq", "M")
+       self.freq = kwargs.get("freq", "Y")
        self.filter = kwargs.get("filter", "")
        self.rootDir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
@@ -53,7 +60,7 @@ class InputDataSource:
         # type: () -> str
         return
 
-class InputDataset:
+class InputDataset(object):
 
     def __init__(self, _sources ):
        # type: (list[InputDataSource]) -> None
@@ -84,17 +91,17 @@ class InputDataset:
     @staticmethod
     def deserialize( lines ):
         # type: (list[str]) -> InputDataset
-        from cliMLe.pcProject import PCDataset
+        from cliMLe.climatele import ClimateleDataset
         sources = []
         for iLine in range(len(lines)):
             if lines[iLine].startswith("#PCDataset"):
-                sources.append( PCDataset.deserialize( lines[iLine:]) )
+                sources.append(ClimateleDataset.deserialize(lines[iLine:]))
         return InputDataset( sources )
 
 class CDMSInputSource(InputDataSource):
 
     def __init__(self, name, variableList, **kwargs ):
-        InputDataSource.__init__( self, name, **kwargs )
+        super(CDMSInputSource, self).__init__(name, **kwargs)
         self.variables = variableList
         self.dataFile = self.getDataFilePath("cvdp","nc")
         self.variables = variableList
@@ -171,3 +178,113 @@ class CDMSInputSource(InputDataSource):
         # type: () -> int
         self.initialize()
         return self.data.shape[1]
+
+class ReanalysisInputSource(InputDataSource):
+
+    def __init__(self, name, variableList, **kwargs ):
+        # type: (str, list[ODAPVariable] ) -> None
+        super(ReanalysisInputSource, self).__init__(name, **kwargs)
+        self.parms = kwargs
+        self.variables = variableList
+        self.data = None
+
+    def getSelector(self):
+        selector = Selector()
+        level_val = self.parms.get("level",None)
+        if level: selector = selector & level(level_val)
+        lat_bounds = self.parms.get("latitude",None)
+        if lat_bounds: selector = selector & Selector(latitude=lat_bounds)
+        lon_bounds = self.parms.get("longitude",None)
+        if lon_bounds: selector = selector & Selector(longitude=lon_bounds)
+        time_bounds = self.parms.get("time",None)
+        if time_bounds: selector = selector & Selector(time=lon_bounds)
+        return selector
+
+    def getTimeseries( self ):
+        # type: () -> list[np.ndarray]
+        debug = False
+        norm_timeseries = []
+        dates = None
+        roi_selector = self.getSelector()
+        for var in self.variables:
+            dset = cdms.open( var.dsetUrl )
+            variable =  dset( var.varname, var.getSelector( roi_selector ) ).squeeze() # type: cdms.tvariable.TransientVariable
+            if dates is None:
+                timeAxis = variable.getTime()      # type: cdms.axis.Axis
+                dates = [ datetime.date() for datetime in timeAxis.asdatetime() ]
+            timeseries =  variable.data  # type: np.ndarray
+            if self.filter:
+                slices = []
+                months = [ date.month for date in dates ]
+                (month_filter_start_index, filter_len) = Analytics.getMonthFilterIndices(self.filter)
+                for mIndex in range(len(months)):
+                    if months[mIndex] == month_filter_start_index:
+                        slice = timeseries[ mIndex: mIndex + filter_len ]
+                        slices.append( slice )
+                batched_data = np.row_stack( slices )
+                if self.freq == "M": batched_data = batched_data.flatten()
+                elif self.freq == "YA": batched_data = np.average(batched_data,1)
+            else:
+                batched_data = Analytics.yearlyAve( self.timeRange.startDate, "M", timeseries ) if self.freq == "Y" else timeseries
+            batched_data = batched_data.reshape( [ batched_data.shape[0], -1 ] )
+            if self.normalize:
+                centered_data = Analytics.center( batched_data )
+                batched_data = Analytics.normalize( centered_data )
+            for iS in range(self.smooth): batched_data = Analytics.lowpass( batched_data )
+            norm_timeseries.append( batched_data )
+        dset.close()
+        return norm_timeseries
+
+    def listVariables(self):
+        # type: () -> list[str]
+        dset = cdms.open(self.dsetUrl)
+        return dset.variables.keys()
+
+    def getVariableIds(self):
+        # type: () -> str
+        return "-".join( self.listVariables() )
+
+    def initialize(self):
+        if self.data == None:
+            timeseries = self.getTimeseries()
+            self.data = np.column_stack( timeseries )
+
+    def getEpoch(self):
+        # type: () -> np.ndarray
+        self.initialize()
+        return self.data
+
+    def getInputDimension(self):
+        # type: () -> int
+        self.initialize()
+        return self.data.shape[1]
+
+    def getExperimentIds(self):
+        return []
+
+if __name__ == "__main__":
+
+    def getDsetUrl( pname, varname ):
+        if pname.lower() == "merra2": data_path = 'https://dataserver.nccs.nasa.gov/thredds/dodsC/bypass/CREATE-IP/Reanalysis/NASA-GMAO/GEOS-5/MERRA2/mon/atmos/' + varname + '.ncml'
+        elif pname.lower() == "20crv2c": data_path = 'https://dataserver.nccs.nasa.gov/thredds/dodsC/bypass/CREATE-IP/reanalysis/20CRv2c/mon/atmos/' + varname + '.ncml'
+        else: raise Exception( " Unrecognized project: " + pname )
+        return data_path
+
+    projectName = "merra2"
+    variables = [ODAPVariable("ts", getDsetUrl(projectName, "ts"))]
+    start_year = 1980
+    end_year = 2015
+    start_time = cdtime.comptime(start_year)
+    end_time = cdtime.comptime(end_year)
+    filter = "8"
+    freq="Y"
+
+    inputs = ReanalysisInputSource(projectName, variables, latitude=(-80,80), time=(start_time,end_time), filter=filter, freq=freq )
+
+    epoch = inputs.getEpoch()
+
+    print "Epoch shape = " + str( epoch.shape )
+    print "Epoch sample = " + str( epoch[0] )
+
+
+

@@ -1,8 +1,8 @@
-from cliMLe.climatele import Project, Variable, Experiment, ClimateleDataset
+from cliMLe.project import Project, Variable, Experiment, ODAPVariable
 from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
 from cliMLe.dataProcessing import CTimeRange, CDuration
-from cliMLe.inputData import CDMSInputSource, InputDataset
+from cliMLe.inputData import ReanalysisInputSource, InputDataset
 from cliMLe.layers import Layer, Layers
 import cdms2 as cdms
 import cdtime, math, cdutil, time, os
@@ -14,94 +14,73 @@ plotVerification = False
 trainStartDate="1851-1-1"
 trainEndDate="2005-12-1"
 verificationSplitDate= "1861-1-1"
+learning_range = CTimeRange.new(verificationSplitDate, trainEndDate) if plotVerification else CTimeRange.new(trainStartDate, trainEndDate)
 
-pname = "20CRv2c"
-projectName = pname + "_EOFs"
-nModes = 32
-start_year = None
-end_year = None
-nTS = 1
-smooth = 0
-freq="Y"   # Yearly input/outputs
-filter="8"   # Filter months out of each year.
-variables = [ Variable("ts"), Variable( "zg", 80000 ) ]  # [ Variable("ts"), Variable( "zg", 80000 ), Variable( "zg", 50000 ), Variable( "zg", 25000 ) ]
-
-if pname.lower() == "merra2":
-    start_year = 1980
-    end_year = 2015
-elif pname.lower() == "20crv2c":
-    start_year = 1851
-    end_year = 2012
-
-input_vars = {}
-
-for var in variables:
-    if pname.lower() == "merra2": data_path = 'https://dataserver.nccs.nasa.gov/thredds/dodsC/bypass/CREATE-IP/Reanalysis/NASA-GMAO/GEOS-5/MERRA2/mon/atmos/' + var.varname + '.ncml'
-    elif pname.lower() == "20crv2c": data_path = 'https://dataserver.nccs.nasa.gov/thredds/dodsC/bypass/CREATE-IP/reanalysis/20CRv2c/mon/atmos/' + var.varname + '.ncml'
-    else: raise Exception( "Unknown project name: " + pname )
-    start_time = cdtime.comptime(start_year)
-    end_time = cdtime.comptime(end_year)
-
-    #------------------------------ READ DATA ------------------------------
-
-    read_start = time.time()
-    if var.level:
-        experiment = projectName + '_'+str(start_year)+'-'+str(end_year) + '_M' + str(nModes) + "_" + var.varname + "-" + str(var.level)
-        f = cdms.open(data_path)
-        variable = f( var.varname, latitude=(-80,80), level=(var.level,var.level), time=(start_time,end_time) )  # type: cdms.tvariable.TransientVariable
+def getDsetUrl(pname, varname):
+    if pname.lower() == "merra2":
+        data_path = 'https://dataserver.nccs.nasa.gov/thredds/dodsC/bypass/CREATE-IP/Reanalysis/NASA-GMAO/GEOS-5/MERRA2/mon/atmos/' + varname + '.ncml'
+    elif pname.lower() == "20crv2c":
+        data_path = 'https://dataserver.nccs.nasa.gov/thredds/dodsC/bypass/CREATE-IP/reanalysis/20CRv2c/mon/atmos/' + varname + '.ncml'
     else:
-        experiment = projectName + '_'+str(start_year)+'-'+str(end_year) + '_M' + str(nModes) + "_" + var.varname
-        f = cdms.open(data_path)
-        variable = f( var.varname, latitude=(-80,80), time=(start_time,end_time) )  # type: cdms.tvariable.TransientVariable
+        raise Exception(" Unrecognized project: " + pname)
+    return data_path
 
-    input_vars[experiment] = variable
+projectName = "20crv2c"
+variables = [ODAPVariable("ts", getDsetUrl(projectName, "ts"))]
+proj_start_year = 1851
+proj_end_year = 2012
+filter = "8"
+freq = "Y"
+nTS = 1
+nModes = 32
+smooth = 0
 
-    print "Completed data read in " + str(time.time()-read_start) + " sec "
-
+inputs = ReanalysisInputSource(projectName, variables, latitude=(-80, 80), filter=filter, freq=freq, time = learning_range )
+inputDataset = InputDataset( [ inputs ] )
 
 prediction_lag = CDuration.years(1)
-nInterationsPerProc = 20
+nInterationsPerProc = 3
 batchSize = 200
-nEpocs = 1000
-learnRate = 0.005
+nEpocs = 500
+learnRate = 0.001
 momentum=0.9
 decay=0.002
 loss_function="mse"
 nesterov=False
 validation_fraction = 0.2
 stopCondition="minValTrain"
-earlyTermIndex=50
+earlyTermIndex=20
 shuffle=True
 nHiddenUnits = 64
-
 initWtsMethod="lecun_normal"   # lecun_uniform glorot_normal glorot_uniform he_normal lecun_normal he_uniform
-orthoWts=False
+orthoWts=True
+parallelExe = True
+
+input_epoch = inputs.getEpoch()
+input_shape = input_epoch.shape
 
 tds = [ IITMDataSource( domain, "JJAS" ) for domain in [ "AI" ] ] # [ "AI", "EPI", "NCI", "NEI", "NMI", "NWI", "SPI", "WPI"]
-trainingDataset = TrainingDataset.new( tds, pcDataset, prediction_lag )
+trainingDataset = TrainingDataset.new( tds, inputs, prediction_lag )
 
 #ref_time_range = ( "1980-1-1", "2014-12-1" )
 #ref_ts = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], ref_time_range )
 
-layers = [ Layer( "dense", nHiddenUnits, activation = "relu", kernel_initializer = initWtsMethod ), Layer( "dense", trainingDataset.getOutputSize(), kernel_initializer = initWtsMethod ) ]
+layers3 = [ Layer( "dense", nModes, trainable=False ),
+           Layer( "dense", nHiddenUnits, activation = "relu", kernel_initializer = initWtsMethod ),
+           Layer( "dense", trainingDataset.getOutputSize(), kernel_initializer = initWtsMethod ) ]
+
+layers2 = [ Layer( "dense", nModes, activation = "relu", kernel_initializer = initWtsMethod ),
+            Layer( "dense", trainingDataset.getOutputSize(), kernel_initializer = initWtsMethod ) ]
 
 def learning_model_factory( inputs=inputDataset, target=trainingDataset, weights=None ):
-    return LearningModel( inputs, target, layers, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, shuffle=shuffle, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
+    return LearningModel( inputs, target, layers3, verbose=False, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, shuffle=shuffle, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
 
-result = LearningModel.parallel_execute( learning_model_factory, nInterationsPerProc )
+result = LearningModel.fit( learning_model_factory, nInterationsPerProc, parallelExe )
 
 learningModel = learning_model_factory()
 learningModel.serialize( inputDataset, trainingDataset, result )
 
 if plotPrediction:
-    plot_title = "Training data with Prediction ({0}->IITM, lag {1}) {2}-{3} (loss: {4}, Epochs: {5})".format(pcDataset.getVariableIds(),prediction_lag,proj_start_year,proj_end_year,result.val_loss,result.nEpocs)
+    plot_title = "Training data with Prediction ({0}->IITM, lag {1}) {2}-{3} (loss: {4}, Epochs: {5})".format(inputs.getVariableIds(),prediction_lag,trainStartDate,trainEndDate,result.val_loss,result.nEpocs)
     learningModel.plotPrediction( result, "Monsoon Prediction with IITM" )
     learningModel.plotPerformance( result, plot_title )
-
-if plotVerification:
-    verification_range = CTimeRange.new(trainStartDate, verificationSplitDate)
-    pcVerificationDataset = ClimateleDataset(projectName, experiments, nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = verification_range)
-    verInputDataset = InputDataset( [ pcVerificationDataset ] )
-    verTargetDataset = TrainingDataset.new( tds, pcVerificationDataset, prediction_lag )
-    verificationModel = learning_model_factory( verInputDataset, verTargetDataset )
-    verificationModel.plotPrediction( result, "Verification" )

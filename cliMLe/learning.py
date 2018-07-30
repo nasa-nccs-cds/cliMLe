@@ -1,8 +1,5 @@
 from keras.models import Sequential, Model
 from keras.layers import Dense, Activation
-from typing import Optional, Any
-
-from cliMLe.climatele import Project, Variable, Experiment, ClimateleDataset
 from cliMLe.inputData import InputDataset
 from cliMLe.layers import Layer, Layers
 from cliMLe.trainingData import *
@@ -166,6 +163,7 @@ class PerformanceTracker(Callback):
         self.val_loss_history = None
         self.training_loss_history = None
         self.nIters = 0
+        self.verbose = kwargs.get( "verbose", False )
         self.termIters = kwargs.get('earlyTermIndex', -1 )
 
     def on_train_begin(self, logs=None):
@@ -173,6 +171,7 @@ class PerformanceTracker(Callback):
         self.minTrainLoss = sys.float_info.max
         self.nSteps = 0
         self.nEpoc = 0
+        self.epochCount = 0
         self.best_weights = None
         self.nUphillIters = -1
 
@@ -186,12 +185,17 @@ class PerformanceTracker(Callback):
     def on_epoch_end(self, epoch, logs=None):
         val_loss = self.model.history.history.get('val_loss',None)
         training_loss = self.model.history.history.get('loss',None)
+        if self.verbose:
+            tloss = training_loss[-1] if training_loss else "UNDEF"
+            vloss = val_loss[-1] if val_loss else "UNDEF"
+            print "* I[{0}]-E[{1}]-> training_loss: {2}, val_loss: {3}".format( self.nIters, self.epochCount, tloss, vloss )
         if val_loss and training_loss:
             vloss, tloss = val_loss[-1], training_loss[-1]
             self._processIter( vloss, tloss )
         if ( self.termIters > 0 ) and ( self.nUphillIters >= self.termIters ):
             logging.info( "Stopping training at iteration: " + str( self.nIters ) )
             self.model.stop_training = True
+        self.epochCount = self.epochCount + 1
 
     def _processIter(self, valLoss, trainLoss ):
         self.nSteps += 1
@@ -430,6 +434,16 @@ class LearningModel(object):
         print " ** Terminating worker processes"
         for proc in processes:
             proc.terminate()
+
+    @classmethod
+    def fit(cls, learning_model_factory, nIterPerProc, parallel=True, nProc=mp.cpu_count() ):
+        # type: ( object(), int, bool, int) -> FitResult
+        if parallel:
+            return cls.parallel_execute( learning_model_factory, nIterPerProc, nProc )
+        else:
+            result =  cls.serial_execute( learning_model_factory, nIterPerProc, nProc )
+            if isinstance(result, basestring): raise Exception( result )
+            return result
 
     @classmethod
     def parallel_execute(cls, learning_model_factory, nIterPerProc, nProc=mp.cpu_count() ):

@@ -5,7 +5,7 @@ import numpy as np
 from typing import List, Union
 from cliMLe.dataProcessing import Analytics, CTimeRange, Parser
 from cliMLe.inputData import InputDataSource
-
+from cliMLe.project import Project, Experiment, PC, EOF
 
 class ClimateleDataset(InputDataSource):
 

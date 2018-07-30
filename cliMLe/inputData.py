@@ -3,6 +3,8 @@ import numpy as np
 import cdms2 as cdms
 from cdms2.selectors import Selector
 from cdms2 import level
+from typing import Optional, Any
+
 from cliMLe.dataProcessing import Analytics, CTimeRange, Parser
 from cliMLe.project import *
 
@@ -186,18 +188,23 @@ class ReanalysisInputSource(InputDataSource):
         super(ReanalysisInputSource, self).__init__(name, **kwargs)
         self.parms = kwargs
         self.variables = variableList
+        self.timeRange = self.parms.get("time",None)  # type: Optional[CTimeRange]
+        if self.timeRange: assert isinstance(self.timeRange, CTimeRange), "Time bounds must be instance of CTimeRange, found: " + self.timeRange.__class__.__name__
         self.data = None
 
     def getSelector(self):
         selector = Selector()
         level_val = self.parms.get("level",None)
-        if level: selector = selector & level(level_val)
+        if level:
+            selector = selector & level(level_val)
         lat_bounds = self.parms.get("latitude",None)
-        if lat_bounds: selector = selector & Selector(latitude=lat_bounds)
+        if lat_bounds:
+            selector = selector & Selector(latitude=lat_bounds)
         lon_bounds = self.parms.get("longitude",None)
-        if lon_bounds: selector = selector & Selector(longitude=lon_bounds)
-        time_bounds = self.parms.get("time",None)
-        if time_bounds: selector = selector & Selector(time=lon_bounds)
+        if lon_bounds:
+            selector = selector & Selector(longitude=lon_bounds)
+        if self.timeRange:
+            selector = selector & self.timeRange.selector()
         return selector
 
     def getTimeseries( self ):
@@ -237,15 +244,14 @@ class ReanalysisInputSource(InputDataSource):
 
     def listVariables(self):
         # type: () -> list[str]
-        dset = cdms.open(self.dsetUrl)
-        return dset.variables.keys()
+        return [ var.varname for var in self.variables ]
 
     def getVariableIds(self):
         # type: () -> str
         return "-".join( self.listVariables() )
 
     def initialize(self):
-        if self.data == None:
+        if self.data is None:
             timeseries = self.getTimeseries()
             self.data = np.column_stack( timeseries )
 

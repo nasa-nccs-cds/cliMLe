@@ -1,4 +1,5 @@
-from cliMLe.climatele import Project, Variable, Experiment, ClimateleDataset
+from cliMLe.climatele import ClimateleDataset
+from cliMLe.project import Project, Variable, Experiment
 from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
 from cliMLe.dataProcessing import CTimeRange, CDuration

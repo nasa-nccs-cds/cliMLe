@@ -7,6 +7,7 @@ from typing import Optional, Any
 
 from cliMLe.dataProcessing import Analytics, CTimeRange, Parser
 from cliMLe.project import *
+from cliMLe.svd import Eof
 
 # NONE = 0
 # BATCH = 1
@@ -25,6 +26,7 @@ class InputDataSource(object):
        self.freq = kwargs.get("freq", "Y")
        self.filter = kwargs.get("filter", "")
        self.rootDir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+       self.data = None
 
     def serialize(self,lines):
         Parser.sparm( lines, "normalize", self.normalize )
@@ -35,6 +37,25 @@ class InputDataSource(object):
         Parser.sparm( lines, "filter", self.filter )
         Parser.sparm( lines, "timeRange", self.timeRange.serialize() )
 
+    def getEOFWeights(self, nModes, **kwargs):
+        self.normalize = True
+        self.initialize()
+        self.solver = Eof( self.data, **kwargs )
+        eofs = self.solver.eofs( neofs=nModes )
+        self.pcs = self.solver.pcs( npcs=nModes ).transpose()
+#        self.projected_pcs = self.solver.projectField( self.data,neofs=nModes).transpose()
+        self.projected_pcs = np.dot( self.data, eofs.T )
+        weight_norm = self.projected_pcs.std(0).reshape([-1,1])
+        self.eofWeights = eofs / weight_norm
+        return self.eofWeights
+
+    def norm(self,data,axis=0):
+        # type: (np.ndarray) -> np.ndarray
+        mean = data.mean(axis)
+        centered = (data - mean)
+        std = centered.std(axis)
+        return centered / std
+
     def getDataFilePath(self, type, ext ):
         # type: (str,str) -> str
         return os.path.join(os.path.join(self.rootDir, "data",type), self.name + "." + ext )
@@ -42,15 +63,20 @@ class InputDataSource(object):
     def getName(self):
         return self.name
 
-    @abc.abstractmethod
     def getEpoch(self):
         # type: () -> np.ndarray
-        return
+        self.initialize()
+        return self.data
 
     @abc.abstractmethod
+    def initialize(self):
+        # type: () -> None
+        return
+
     def getInputDimension(self):
         # type: () -> int
-        return
+        self.initialize()
+        return self.data.shape[1]
 
     @abc.abstractmethod
     def getVariableIds(self):
@@ -76,6 +102,12 @@ class InputDataset(object):
         epocs = [ source.getEpoch() for source in self.sources ]
         result = np.column_stack( epocs )
         return result
+
+    def getEOFWeights(self, nModes, **kwargs):
+        # type: () -> np.ndarray
+        pcs = [source.getEOFWeights(nModes, **kwargs) for source in self.sources]
+        result = np.column_stack( pcs )
+        return result.T
 
     def getInputDimension(self):
         # type: () -> int
@@ -171,15 +203,6 @@ class CDMSInputSource(InputDataSource):
             timeseries = self.getTimeseries()
             self.data = np.column_stack( timeseries )
 
-    def getEpoch(self):
-        # type: () -> np.ndarray
-        self.initialize()
-        return self.data
-
-    def getInputDimension(self):
-        # type: () -> int
-        self.initialize()
-        return self.data.shape[1]
 
 class ReanalysisInputSource(InputDataSource):
 
@@ -254,16 +277,6 @@ class ReanalysisInputSource(InputDataSource):
         if self.data is None:
             timeseries = self.getTimeseries()
             self.data = np.column_stack( timeseries )
-
-    def getEpoch(self):
-        # type: () -> np.ndarray
-        self.initialize()
-        return self.data
-
-    def getInputDimension(self):
-        # type: () -> int
-        self.initialize()
-        return self.data.shape[1]
 
     def getExperimentIds(self):
         return []

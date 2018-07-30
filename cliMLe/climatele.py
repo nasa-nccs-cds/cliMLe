@@ -15,6 +15,8 @@ class ClimateleDataset(InputDataSource):
        self.nModes = int( kwargs.get( "nmodes", "-1" ) )
        self.experiments = _experiments if isinstance( _experiments, (list, tuple) ) else [ _experiments ] # type: List[Experiment]
        self.selector = self.timeRange.selector() if self.timeRange else None
+
+    def initialize(self):
        input_cols = []
        if self.filter :
            input_cols.extend( [self.preprocess(var) for var in self.getVariables()] )
@@ -60,6 +62,7 @@ class ClimateleDataset(InputDataSource):
 
     def getInputDimension(self):
         # type: () -> int
+        self.initialize()
         return self.data.shape[1]
 #        size = 0
 #        for experiment in self.experiments:
@@ -106,7 +109,3 @@ class ClimateleDataset(InputDataSource):
             batched_data = Analytics.yearlyAve( self.timeRange.startDate, "M", norm_data ) if self.freq == "Y" else norm_data
 
         return batched_data
-
-    def getEpoch(self):
-        # type: () -> np.ndarray
-        return self.data

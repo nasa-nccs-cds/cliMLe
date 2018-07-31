@@ -3,6 +3,7 @@ from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
 from cliMLe.dataProcessing import CTimeRange, CDuration
 from cliMLe.inputData import ReanalysisInputSource, InputDataset
+from cliMLe.climatele import ClimateleDataset
 from cliMLe.layers import Layer, Layers
 import cdms2 as cdms
 import cdtime, math, cdutil, time, os
@@ -39,6 +40,12 @@ weights = inputDataset.getEOFWeights( nModes )
 biases = np.zeros( [nModes] )
 print "Weights Shape = " + str( weights.shape )
 print "Weights Sample = " + str( weights[0] )
+
+variables1 = [ Variable("ts"), Variable( "zg", 80000 ) ]  # [ Variable("ts"), Variable( "zg", 80000 ), Variable( "zg", 50000 ), Variable( "zg", 25000 ) ]
+project = Project.new(outDir,projectName)
+experiments = [ Experiment(project,proj_start_year,proj_end_year,64,variable) for variable in variables1 ]
+pcDataset = ClimateleDataset(projectName, experiments, nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = learning_range)
+pcInputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
 nInterationsPerProc = 3
@@ -78,7 +85,10 @@ layers2 = [ Layer( "dense", nModes, activation = "relu", kernel_initializer = in
 def learning_model_factory( inputs=inputDataset, target=trainingDataset, weights=None ):
     return LearningModel( inputs, target, layers3, verbose=False, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, shuffle=shuffle, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
 
-result = LearningModel.fit( learning_model_factory, nInterationsPerProc, parallelExe )
+def pc_learning_model_factory( inputs=pcInputDataset, target=trainingDataset, weights=None ):
+    return LearningModel( inputs, target, layers2, verbose=False, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, shuffle=shuffle, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
+
+result = LearningModel.fit( pc_learning_model_factory, nInterationsPerProc, parallelExe )
 
 learningModel = learning_model_factory()
 learningModel.serialize( inputDataset, trainingDataset, result )

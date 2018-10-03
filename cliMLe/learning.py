@@ -3,10 +3,9 @@ from keras.layers import Dense, Activation
 from cliMLe.inputData import InputDataset
 from cliMLe.layers import Layer, Layers
 from cliMLe.trainingData import *
-import time, keras, copy
+import time, copy
 from datetime import datetime
 from keras.callbacks import TensorBoard, History, Callback
-import tensorflow as tf
 import matplotlib.pyplot as plt
 import multiprocessing as mp
 import random, sys
@@ -387,8 +386,8 @@ class LearningModel(object):
         targetNames = self.outputs.targetNames()
         for iPlot in range(prediction1.shape[1]):
             plt.title( targetNames[iPlot] + ": " + title )
-            plt.plot_date(self.dates, prediction1[:,iPlot], "-", label="prediction: fitted" )
-            plt.plot_date(self.dates, self.outputData[:,iPlot], "--", label="training data" )
+            plt.plot_date(self.dates, prediction1[:,iPlot], "r-", label="prediction: fitted" )
+            plt.plot_date(self.dates, self.outputData[:,iPlot], "b--", label="training data" )
             plt.legend()
             plt.show()
 

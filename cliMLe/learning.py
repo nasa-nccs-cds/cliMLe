@@ -226,6 +226,7 @@ class LearningModel(object):
         self.nEpocs = int( kwargs.get( 'epocs', 300 ) )
         self.validation_fraction = float( kwargs.get(  'vf', 0.1 ) )
         self.timeRange = kwargs.get(  'timeRange', None )
+        self.eager = kwargs.get(  'eager', False )
         self.hidden = Parser.raint( kwargs.get( 'hidden', None ) )
         self.activation = kwargs.get( 'activation', 'relu' )
         self.shuffle = bool( kwargs.get('shuffle', False ) )
@@ -245,6 +246,8 @@ class LearningModel(object):
         self.tensorboard = TensorBoard( log_dir=self.logDir, histogram_freq=0, write_graph=True )
         self.performanceTracker = PerformanceTracker( self.stop_condition, **kwargs )
         self.bestFitResult = None # type: FitResult
+        self.layer_instances = []
+        if self.eager:  tf.enable_eager_execution()
 #        self.weights_template = self.createSequentialModel().get_weights()
 
     def layerSize(self, layer_index=0 ):
@@ -350,6 +353,36 @@ class LearningModel(object):
         if self.layers is not None:
             for iLayer, layer in enumerate(self.layers):
                 kwargs = { "input_dim": nInputs } if iLayer == 0 else {}
+                instance = layer.instance(**kwargs)
+                self.layer_instances.append( instance )
+                model.add( instance )
+
+        elif self.hidden is not None:
+            nHidden = len(self.hidden)
+            nOutputs = self.outputs.getOutputSize()
+            for hIndex in range(nHidden):
+                if hIndex == 0:
+                    if self.eager:  model.add(Dense(units=self.hidden[hIndex], activation=self.activation, input_tensor=self.inputData))
+                    else:           model.add(Dense(units=self.hidden[hIndex], activation=self.activation, input_dim=nInputs))
+                else:
+                    model.add(Dense(units=self.hidden[hIndex], activation=self.activation))
+            output_layer = Dense(units=nOutputs) if nHidden else Dense(units=nOutputs, input_dim=nInputs)
+            model.add( output_layer )
+
+        sgd = SGD( lr=self.lr, decay=self.decay, momentum=self.momentum, nesterov=self.nesterov )
+        model.compile(loss=self.lossFunction, optimizer=sgd, metrics=['accuracy'])
+        if self.weights is not None: model.set_weights(self.weights)
+        return model
+
+    def createEagerSequentialModel( self ):
+        # type: () -> Sequential
+        model = Sequential()
+        nInputs = self.inputs.getInputDimension()
+        kwargs = {}
+        model.add( InputLayer( input_tensor=tf.convert_to_tensor(self.inputData, np.float32) ) )
+
+        if self.layers is not None:
+            for iLayer, layer in enumerate(self.layers):
                 model.add( layer.instance(**kwargs) )
 
         elif self.hidden is not None:
@@ -357,10 +390,10 @@ class LearningModel(object):
             nOutputs = self.outputs.getOutputSize()
             for hIndex in range(nHidden):
                 if hIndex == 0:
-                    model.add(Dense(units=self.hidden[hIndex], activation=self.activation, input_dim=nInputs))
+                    model.add(Dense(units=self.hidden[hIndex], activation=self.activation ) )
                 else:
-                    model.add(Dense(units=self.hidden[hIndex], activation=self.activation))
-            output_layer = Dense(units=nOutputs) if nHidden else Dense(units=nOutputs, input_dim=nInputs)
+                    model.add(Dense(units=self.hidden[hIndex], activation=self.activation ) )
+            output_layer = Dense(units=nOutputs) if nHidden else Dense(units=nOutputs )
             model.add( output_layer )
 
         sgd = SGD( lr=self.lr, decay=self.decay, momentum=self.momentum, nesterov=self.nesterov )

@@ -52,6 +52,7 @@ pcInputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
 nInterationsPerProc = 5
+nShuffles = 3
 batchSize = 200
 nEpocs = 500
 learnRate = 0.005
@@ -93,14 +94,14 @@ def pc_learning_model_factory( inputs=pcInputDataset, target=trainingDataset, we
     return LearningModel( inputs, target, layers2, verbose=False, eager=eagerExe, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, shuffle=shuffle, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
 
 learning_model_factory = direct_learning_model_factory
-result = LearningModel.fit( learning_model_factory, nInterationsPerProc, parallelExe )
+result = LearningModel.fit( learning_model_factory, nInterationsPerProc, nShuffles, parallelExe )
 
 def direct_learning_model_factory_trainable( ):
     layers3[0].setTrainable( True )
     return LearningModel( reanalysisInputDataset, trainingDataset, layers3, verbose=False, eager=eagerExe, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, shuffle=shuffle, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, epocs=nEpocs, vf=validation_fraction, weights=result.final_weights )
 
 learning_model_factory = direct_learning_model_factory_trainable
-result = LearningModel.fit( learning_model_factory, nInterationsPerProc, parallelExe )
+result = LearningModel.fit( learning_model_factory, nInterationsPerProc, nShuffles, parallelExe )
 
 learningModel = learning_model_factory()
 

@@ -40,6 +40,7 @@ inputDataset = InputDataset( [ inputs ] )
 
 prediction_lag = CDuration.years(1)
 nInterationsPerProc = 3
+nShuffles = 3
 batchSize = 200
 nEpocs = 500
 learnRate = 0.001
@@ -75,7 +76,7 @@ layers2 = [ Layer( "dense", nModes, activation = "relu", kernel_initializer = in
 def learning_model_factory( inputs=inputDataset, target=trainingDataset, weights=None ):
     return LearningModel( inputs, target, layers3, verbose=False, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, shuffle=shuffle, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
 
-result = LearningModel.fit( learning_model_factory, nInterationsPerProc, parallelExe )
+result = LearningModel.fit( learning_model_factory, nInterationsPerProc, nShuffles, parallelExe )
 
 learningModel = learning_model_factory()
 learningModel.serialize( inputDataset, trainingDataset, result )

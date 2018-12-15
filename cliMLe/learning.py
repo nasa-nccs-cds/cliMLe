@@ -253,7 +253,7 @@ class LearningModel(object):
     def layerSize(self, layer_index=0 ):
         return self.hidden[layer_index] if self.hidden is not None else self.layers[layer_index].dim
 
-    def execute( self, nIterations=1, procIndex=-1 ):
+    def execute( self, nIterations=1, nShuffles=3, procIndex=-1 ):
         # type: () -> FitResult
         self.reseed()
         for iterIndex in range(nIterations):
@@ -263,9 +263,19 @@ class LearningModel(object):
                 orthoWts = Analytics.orthoModes( self.inputData, self.layerSize() )
                 initial_weights[0][:,0:orthoWts.shape[1]] = orthoWts
                 model.set_weights( initial_weights )
-            history = model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, callbacks=[self.tensorboard,self.performanceTracker], verbose=0 )  # type: History
+            for shuffleIndex in range(nIterations):
+                shuffled_input_data, shuffled_training_data = self.shuffle_data( self.inputData, self.outputData )
+                history = model.fit( shuffled_input_data, shuffled_training_data, batch_size=self.batchSize, epochs=self.nEpocs, validation_split=self.validation_fraction, shuffle=False, callbacks=[self.tensorboard,self.performanceTracker], verbose=0 )  # type: History
             self.updateHistory( history, initial_weights, iterIndex, procIndex )
         return self.bestFitResult.recordPerformance( self.performanceTracker )
+
+    def shuffle_data(self, input_data, training_data ): #  -> ( shuffled_input_data, shuffled_training_data):
+        indices = np.arange(input_data.shape[0])
+        np.random.shuffle(indices)
+        shuffled_input_data, shuffled_training_data = np.copy(input_data), np.copy(training_data)
+        shuffled_input_data[:] = input_data[indices]
+        shuffled_training_data[:] = training_data[indices]
+        return ( shuffled_input_data, shuffled_training_data)
 
     def serialize( self, inputDataset, trainingDataset, result ):
         # type: (InputDataset, TrainingDataset, FitResult) -> None
@@ -344,6 +354,25 @@ class LearningModel(object):
         model.set_weights( fitResult.final_weights )
 #        model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=fitResult.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, verbose=0 )  # type: History
         return model
+
+    def getBackProjection(self, path ):
+        import xarray as xr
+        import keras.backend as K
+        learningModel, result = LearningModel.load( path )
+        model = learningModel.getFittedModel( result )
+
+        out_diff = K.mean((model.layers[-1].output - 1) ** 2)
+        grad = K.gradients(out_diff, [model.input])[0]
+        grad /= K.maximum(K.sqrt(K.mean(grad ** 2)), K.epsilon())
+        iterate = K.function( [model.input, K.learning_phase()], [out_diff, grad] )
+        input_img_data = np.zeros( shape=model.weights[0].shape )
+
+        print "Back Projection Map, Iterations:"
+        for i in range(20):
+            out_loss, out_grad = iterate([input_img_data, 0])
+            input_img_data -= out_grad * 0.1
+            print str(i) + ": loss = " + str(out_loss)
+        return [ xr.DataArray(input_img_data)  ]
 
     def createSequentialModel( self ):
         # type: () -> Sequential
@@ -447,11 +476,11 @@ class LearningModel(object):
         plt.show()
 
     @classmethod
-    def serial_execute(cls, lmodel_factory, nInterations, procIndex=-1, resultQueue=None):
-        # type: (object(), int, int, mp.Queue) -> Union[FitResult,str]
+    def serial_execute(cls, lmodel_factory, nInterations, nShuffles, procIndex=-1, resultQueue=None):
+        # type: (object(), int, int, int, mp.Queue) -> Union[FitResult,str]
         try:
             learningModel = lmodel_factory()  # type: LearningModel
-            result = learningModel.execute( nInterations, procIndex )
+            result = learningModel.execute( nInterations, nShuffles, procIndex )
             if resultQueue is not None: resultQueue.put( result )
             return result
         except Exception as err:
@@ -468,17 +497,17 @@ class LearningModel(object):
             proc.terminate()
 
     @classmethod
-    def fit(cls, learning_model_factory, nIterPerProc, parallel=True, nProc=mp.cpu_count() ):
+    def fit(cls, learning_model_factory, nIterPerProc, nShuffles, parallel=True, nProc=mp.cpu_count() ):
         # type: ( object(), int, bool, int) -> FitResult
         if parallel:
-            return cls.parallel_execute( learning_model_factory, nIterPerProc, nProc )
+            return cls.parallel_execute( learning_model_factory, nIterPerProc, nShuffles, nProc )
         else:
-            result =  cls.serial_execute( learning_model_factory, nIterPerProc, nProc )
+            result =  cls.serial_execute( learning_model_factory, nIterPerProc, nShuffles, nProc )
             if isinstance(result, basestring): raise Exception( result )
             return result
 
     @classmethod
-    def parallel_execute(cls, learning_model_factory, nIterPerProc, nProc=mp.cpu_count() ):
+    def parallel_execute(cls, learning_model_factory, nIterPerProc, nShuffles, nProc=mp.cpu_count() ):
         # type: ( object(), int, int) -> FitResult
         t0 = time.time()
         results = []
@@ -490,7 +519,7 @@ class LearningModel(object):
 
             for iProc in range(nProc):
                 print " ** Executing process " + str(iProc) + ": NIterations: " + str(nIterPerProc)
-                proc = mp.Process(target=cls.serial_execute, args=(learning_model_factory, nIterPerProc, iProc, resultQueue))
+                proc = mp.Process(target=cls.serial_execute, args=(learning_model_factory, nIterPerProc, nShuffles, iProc, resultQueue))
                 proc.start()
                 learning_processes.append(proc)
 

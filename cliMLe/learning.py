@@ -355,10 +355,11 @@ class LearningModel(object):
 #        model.fit( self.inputData, self.outputData, batch_size=self.batchSize, epochs=fitResult.nEpocs, validation_split=self.validation_fraction, shuffle=self.shuffle, verbose=0 )  # type: History
         return model
 
-    def getBackProjection(self, path ):
+    @classmethod
+    def getBackProjection( cls, instance ):
         import xarray as xr
         import keras.backend as K
-        learningModel, result = LearningModel.load( path )
+        learningModel, result = cls.loadInstance( instance )
         model = learningModel.getFittedModel( result )
 
         out_diff = K.mean((model.layers[-1].output - 1) ** 2)
@@ -372,7 +373,7 @@ class LearningModel(object):
             out_loss, out_grad = iterate([input_img_data, 0])
             input_img_data -= out_grad * 0.1
             print str(i) + ": loss = " + str(out_loss)
-        return [ xr.DataArray(input_img_data)  ]
+        return xr.DataArray(input_img_data)
 
     def createSequentialModel( self ):
         # type: () -> Sequential

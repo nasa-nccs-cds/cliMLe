@@ -7,7 +7,6 @@ import time, keras
 from datetime import datetime
 from keras.callbacks import TensorBoard, History
 from cliMLe.learning import FitResult, LearningModel
-import tensorflow as tf
 import matplotlib.pyplot as plt
 outDir = os.path.expanduser("~/results")
 

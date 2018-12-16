@@ -4,6 +4,7 @@ from cliMLe.inputData import InputDataset
 from cliMLe.layers import Layer, Layers
 from cliMLe.trainingData import *
 import time, copy
+import tensorflow as tf
 from datetime import datetime
 from keras.callbacks import TensorBoard, History, Callback
 import matplotlib.pyplot as plt
@@ -369,11 +370,14 @@ class LearningModel(object):
         input_img_data = np.zeros( shape=model.weights[0].shape )
 
         print "Back Projection Map, Iterations:"
-        for i in range(20):
+        current_loss = 1.0e20
+        for i in range(100):
             out_loss, out_grad = iterate([input_img_data, 0])
-            input_img_data -= out_grad * 0.1
+            if out_loss > current_loss: break
+            current_loss = out_loss
+            input_img_data -= out_grad * 0.003
             print str(i) + ": loss = " + str(out_loss)
-        return xr.DataArray(input_img_data)
+        return input_img_data[0]
 
     def createSequentialModel( self ):
         # type: () -> Sequential

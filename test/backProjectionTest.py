@@ -2,7 +2,7 @@ from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel
 import matplotlib.pyplot as plt
 
-instance = "good_1"
+instance = "ams-result-1"
 result = LearningModel.getBackProjection( instance )
 
 fig, ax = plt.subplots()

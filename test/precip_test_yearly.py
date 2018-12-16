@@ -34,7 +34,7 @@ inputDataset = InputDataset( [ pcDataset ] )
 
 prediction_lag = CDuration.years(1)
 nInterationsPerProc = 20
-nShuffles = 3
+shuffle = True
 batchSize = 50
 nEpocs = 500
 learnRate = 0.005
@@ -66,7 +66,7 @@ layers = layersD[nLayers]
 def learning_model_factory( inputs=inputDataset, target=trainingDataset, weights=None ):
     return LearningModel( inputs, target, layers, batch=batchSize, earlyTermIndex=earlyTermIndex, lrate=learnRate, stop_condition=stopCondition, loss_function=loss_function, momentum=momentum, decay=decay, nesterov=nesterov, orthoWts=orthoWts, epocs=nEpocs, vf=validation_fraction, weights=weights )
 
-result = LearningModel.parallel_execute( learning_model_factory, nInterationsPerProc, nShuffles )
+result = LearningModel.parallel_execute( learning_model_factory, nInterationsPerProc, shuffle )
 
 learningModel = learning_model_factory()
 learningModel.serialize( inputDataset, trainingDataset, result )

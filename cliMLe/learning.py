@@ -357,13 +357,13 @@ class LearningModel(object):
         return model
 
     @classmethod
-    def getBackProjection( cls, instance ):
+    def getActivationBackProjection( cls, instance, target_value ):
         import xarray as xr
         import keras.backend as K
         learningModel, result = cls.loadInstance( instance )
         model = learningModel.getFittedModel( result )
 
-        out_diff = K.mean( (model.layers[-1].output - learningModel.outputs.getTimeseriesData()[1] ) ** 2 )
+        out_diff = K.mean( (model.layers[-1].output - target_value ) ** 2 )
         grad = K.gradients(out_diff, [model.input])[0]
         grad /= K.maximum(K.sqrt(K.mean(grad ** 2)), K.epsilon())
         iterate = K.function( [model.input, K.learning_phase()], [out_diff, grad] )

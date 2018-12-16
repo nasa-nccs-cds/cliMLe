@@ -357,8 +357,7 @@ class LearningModel(object):
         return model
 
     @classmethod
-    def getActivationBackProjection( cls, instance, target_value ):
-        import xarray as xr
+    def getActivationBackProjection( cls, instance, target_value, learning_rate = 0.002 ):
         import keras.backend as K
         learningModel, result = cls.loadInstance( instance )
         model = learningModel.getFittedModel( result )
@@ -371,11 +370,11 @@ class LearningModel(object):
 
         print "Back Projection Map, Iterations:"
         current_loss = 1.0e20
-        for i in range(100):
+        for i in range(500):
             out_loss, out_grad = iterate([input_img_data, 0])
             if out_loss > current_loss: break
             current_loss = out_loss
-            input_img_data -= out_grad * 0.003
+            input_img_data -= out_grad * learning_rate
             print str(i) + ": loss = " + str(out_loss)
         return input_img_data[0]
 

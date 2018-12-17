@@ -376,7 +376,7 @@ class LearningModel(object):
             current_loss = out_loss
             input_img_data -= out_grad * learning_rate
             print str(i) + ": loss = " + str(out_loss)
-        return input_img_data[0]
+        return ( learningModel, model, input_img_data[0] )
 
     def createSequentialModel( self ):
         # type: () -> Sequential

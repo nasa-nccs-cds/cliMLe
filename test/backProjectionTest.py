@@ -11,8 +11,9 @@ strong_monsoon = ActivationTarget( 3.0, "Strong Monsoon" )
 weak_monsoon = ActivationTarget( -3.0, "Weak Monsoon" )
 
 instance = "ams-result-1"
-activation_target = strong_monsoon
-result = LearningModel.getActivationBackProjection( instance, activation_target.value )
+activation_target = weak_monsoon
+learningModel, model, result = LearningModel.getActivationBackProjection( instance, activation_target.value )
+inputs = learningModel.inputs
 
 fig, ax = plt.subplots()
 y_pos = np.arange(result.shape[0])

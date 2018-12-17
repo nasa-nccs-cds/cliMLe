@@ -1,5 +1,8 @@
-from cliMLe.learning import FitResult, LearningModel
+from cliMLe.learning import LearningModel
+from cliMLe.climatele import Experiment, ClimateleDataset
+from cliMLe.project import PC, EOF
 from cliMLe.svd import Eof
+import matplotlib.pyplot as plt
 import numpy as np
 
 class Visualizer:
@@ -20,21 +23,34 @@ class Visualizer:
             input = lmod.inputData[iPoint]
             x.append( np.dot( modes[0], input ) )
             y.append( np.dot(modes[1], input) )
-            c.append( lmod.outputData[iPoint] )
+            c.append( lmod.outputData[iPoint][0] )
         return np.array( x ), np.array( y ), np.array( c )
 
     @classmethod
     def plotModeDistribution( cls, lmod ):
         # type: (LearningModel) -> None
-        pcd = cls.getPCDistribution( lmod )
+        x, y, c = Visualizer.getPCDistribution(lmod)
 
+        fig, ax = plt.subplots()
+        cax = plt.scatter( x, y, None, c, None, "jet" )
+        cbar = fig.colorbar( cax )
+        plt.title( ' PC Distribution Plot ' )
+        plt.show()
+
+    @classmethod
+    def getWeightedPatterns( cls, lmod ):
+        # type: (LearningModel) -> List[CdmsFile]
+        cdset = None # type: ClimateleDataset
+        dsets = []
+        for cdset in lmod.inputs.sources:
+            for exp in cdset.experiments:
+                dsets.append( exp.getDataset( EOF ) )
+        return dsets
 
 
 if __name__ == "__main__":
     instance = "ams-result-1"
     learningModel, result = LearningModel.loadInstance(instance)
-    model = learningModel.getFittedModel(result)
+#    model = learningModel.getFittedModel(result)
+    dsets = Visualizer.getWeightedPatterns( learningModel )
 
-    x, y, c = Visualizer.getPCDistribution( learningModel)
-
-    print str( x )

@@ -1,11 +1,8 @@
 from cliMLe.trainingData import *
-from cliMLe.learning import FitResult, LearningModel
+from cliMLe.learning import FitResult, LearningModel, ActivationTarget
 import matplotlib.pyplot as plt
 
-class ActivationTarget:
-    def __init__(self, target_value, title_str ):
-        self.value = target_value
-        self.title = title_str
+
 
 strong_monsoon = ActivationTarget( 3.0, "Strong Monsoon" )
 weak_monsoon = ActivationTarget( -3.0, "Weak Monsoon" )

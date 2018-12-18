@@ -215,6 +215,11 @@ class PerformanceTracker(Callback):
     def getWeights(self):
         return self.best_weights
 
+class ActivationTarget:
+    def __init__(self, target_value, title_str ):
+        self.value = target_value
+        self.title = title_str
+
 class LearningModel(object):
 
     def __init__( self, inputDataset, trainingDataset, _layers=None, **kwargs ):

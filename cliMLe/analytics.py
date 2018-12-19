@@ -74,26 +74,26 @@ class Visualizer:
 
     @classmethod
     def getWeightedPatterns( cls, lmod, weights ):
-        # type: ( LearningModel, np.array ) -> List[CdmsFile]
-        nmodes = lmod.inputs.sources[0].nModes
-        results = []
+        # type: ( LearningModel, np.array ) -> List[ cdms2.tvariable.TransientVariable ]
+        results = {}
         for cdset in lmod.inputs.sources:
-            for iexp in range(len(cdset.experiments)):
-                result = None  # type: np.array
-                exp = cdset.experiments[iexp]  # type: Experiment
-                dset = exp.getDataset( EOF )
-                eof = None
-                for imode in range( nmodes ):
-                    eof = dset[ "EOF-" + str(imode) ] # type: cdms2.fvariable.FileVariable
-                    weight = weights[ nmodes * iexp + imode ] * 25.0
-                    result = weight * eof if result is None else result + weight * eof
-                results.append( TransientVariable( result, axes=[eof.getLatitude(),eof.getLongitude()], id=exp.id ) )
-        return results
+            variables = cdset.getVariables(EOF)
+            for ivar in range(len(variables)):
+                variable = variables[ivar]  # type: cdms2.tvariable.TransientVariable
+                attrs = variable.attributes['long_name'].split(",")
+                exp = cdset.getExperiment(attrs[1])
+                dset = exp.getDataset(EOF)
+                eof = dset[attrs[0]]
+                weight =  weights[ ivar ] * 25.0
+                result = results.get( attrs[1], None )
+                new_result = weight * eof if result is None else result + weight * eof
+                results[attrs[1]] = TransientVariable( new_result, axes=[eof.getLatitude(),eof.getLongitude()], id=exp.id )
+        return results.values()
 
 
 if __name__ == "__main__":
-    instance = "ams-result-1"
-    target_value = -3.0
+    instance = "good_2"
+    target_value = 3.0
     learningModel, model, weights = LearningModel.getActivationBackProjection( instance,  target_value )
     patterns = Visualizer.getWeightedPatterns( learningModel, weights )
     Visualizer.mpl_spaceplot( patterns )

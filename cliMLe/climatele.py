@@ -53,11 +53,11 @@ class ClimateleDataset(InputDataSource):
                     experiments.append( Experiment.deserialize(line) )
         return ClimateleDataset(dsname, experiments, **parms)
 
-    def getVariables(self):
-        # type: () -> list[cdms.tvariable.TransientVariable]
+    def getVariables(self, vtype=PC ):
+        # type: (int) -> list[cdms.tvariable.TransientVariable]
         variable_list = []
         for experiment in self.experiments:
-            variable_list.extend( experiment.getVariables( PC, self.selector, self.nModes ) )
+            variable_list.extend( experiment.getVariables( vtype, self.selector, self.nModes ) )
         return variable_list
 
     def getInputDimension(self):
@@ -75,6 +75,11 @@ class ClimateleDataset(InputDataSource):
 
     def getExperimentIds(self):
         return "-". join( [ exp.id for exp in self.experiments ] )
+
+    def getExperiment( self, expId ):
+        for exp in self.experiments:
+            if exp.id == expId: return exp
+        return None
 
     def preprocess(self, var, offset=0 ):
         debug = False

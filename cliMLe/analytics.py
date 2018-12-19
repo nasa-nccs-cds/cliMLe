@@ -41,7 +41,7 @@ class Visualizer:
 
     @classmethod
     def mpl_spaceplot( cls, variables, smooth=True, cbar = False ):
-        # type: ( str, List[TransientVariable], bool ) -> None
+        # type: ( List[TransientVariable], bool, bool ) -> None
         fig = plt.figure()
         nvars = len(variables)
         for ivar in range(nvars):
@@ -92,8 +92,10 @@ class Visualizer:
 
 
 if __name__ == "__main__":
-    instance = "good_2"
-    target_value = 3.0
-    learningModel, model, weights = LearningModel.getActivationBackProjection( instance,  target_value )
-    patterns = Visualizer.getWeightedPatterns( learningModel, weights )
-    Visualizer.mpl_spaceplot( patterns )
+    instance = "ams-3"
+    target_values = [ 3.0, -3.0 ]
+
+    for target_value in target_values:
+        learningModel, model, weights = LearningModel.getActivationBackProjection( instance,  target_value )
+        patterns = Visualizer.getWeightedPatterns( learningModel, weights )
+        Visualizer.mpl_spaceplot( patterns )

@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 strong_monsoon = ActivationTarget( 3.0, "Strong Monsoon" )
 weak_monsoon = ActivationTarget( -3.0, "Weak Monsoon" )
 
-instance = "ams-result-1"
-activation_target = weak_monsoon
+instance = "ams-2"
+activation_target = strong_monsoon
 learningModel, model, result = LearningModel.getActivationBackProjection( instance, activation_target.value )
 inputs = learningModel.inputs
 

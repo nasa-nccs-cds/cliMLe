@@ -80,6 +80,11 @@ trainingDataset = TrainingDataset.new( tds, inputs, prediction_lag )
 #ref_time_range = ( "1980-1-1", "2014-12-1" )
 #ref_ts = ProjectDataSource( "HadISST_1.cvdp_data.1980-2017", [ "nino34" ], ref_time_range )
 
+layers3R = [ Layer( "dense", nModes, trainable=False, kernel_initializer = initWtsMethod ),
+           Layer( "dense", nHiddenUnits, activation = "relu", kernel_initializer = initWtsMethod ),
+           Layer( "dense", trainingDataset.getOutputSize(), kernel_initializer = initWtsMethod ) ]
+
+
 layers3 = [ Layer( "dense", nModes, trainable=False, weights=[ weights, biases ] ),
            Layer( "dense", nHiddenUnits, activation = "relu", kernel_initializer = initWtsMethod ),
            Layer( "dense", trainingDataset.getOutputSize(), kernel_initializer = initWtsMethod ) ]

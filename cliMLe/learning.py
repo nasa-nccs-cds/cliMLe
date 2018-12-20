@@ -373,14 +373,17 @@ class LearningModel(object):
         iterate = K.function( [model.input, K.learning_phase()], [out_diff, grad] )
         input_img_data = np.zeros( shape=model.weights[0].shape )
 
-        print "Back Projection Map, Iterations:"
-        current_loss = 1.0e20
-        for i in range(500):
-            out_loss, out_grad = iterate([input_img_data, 0])
-            if out_loss > current_loss: break
-            current_loss = out_loss
-            input_img_data -= out_grad * learning_rate
-            print str(i) + ": loss = " + str(out_loss)
+        print "Back Projection Map, instance = " + instance + ", Iterations:"
+        out_loss = 0.0
+        for i1 in range(5):
+            for i2 in range(500):
+                out_loss, out_grad = iterate([input_img_data, 0])
+                input_img_data -= out_grad * learning_rate
+                if out_loss < 0.01:
+                    print "  --> Converged, niters = " + str(i1*500+i2) + ": loss = " + str(out_loss)
+            if( out_loss > 1.0 ):
+                learning_rate = learning_rate * 2.0
+                print "    ** Doubling Learning Rate: niters = " + str( (i1+1) * 500 ) + ": loss = " + str(out_loss)
         return ( learningModel, model, input_img_data[0] )
 
     def createSequentialModel( self ):

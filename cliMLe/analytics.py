@@ -40,14 +40,14 @@ class Visualizer:
         plt.show()
 
     @classmethod
-    def mpl_spaceplot( cls, variables, smooth=True, cbar = False ):
-        # type: ( List[TransientVariable], bool, bool ) -> None
+    def mpl_spaceplot( cls, variables, smooth=True, cbar = False, titles = None ):
+        # type: ( List[TransientVariable], bool, bool, List[str] ) -> None
         fig = plt.figure()
         nvars = len(variables)
         for ivar in range(nvars):
             variable = variables[ivar]
             ax = fig.add_subplot( nvars, 1, ivar+1 )
-            ax.set_title(variable.id)
+            ax.set_title(variable.id if titles is None else titles[ivar])
             lons = variable.getLongitude().getValue()
             lats = variable.getLatitude().getValue()
             m = Basemap( llcrnrlon=lons[0],

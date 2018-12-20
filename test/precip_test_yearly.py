@@ -26,7 +26,7 @@ freq="Y"   # Yearly input/outputs
 filter="8"   # Filter months out of each year.
 learning_range = CTimeRange.new(verificationSplitDate, trainEndDate) if plotVerification else CTimeRange.new(trainStartDate, trainEndDate)
 
-variables = [ Variable("ts"), Variable( "zg", 50000 ), Variable( "zg", 80000 ) ]  # [ Variable("ts"), Variable( "zg", 80000 ), Variable( "zg", 50000 ), Variable( "zg", 25000 ) ]
+variables = [ Variable( "zg", 50000 ) ]  # [ Variable("ts"), Variable( "zg", 80000 ), Variable( "zg", 50000 ), Variable( "zg", 25000 ) ]
 project = Project.new(outDir,projectName)
 experiments = [ Experiment(project,proj_start_year,proj_end_year,64,variable) for variable in variables ]
 pcDataset = ClimateleDataset(projectName, experiments, nts = nTS, smooth = smooth, filter=filter, nmodes=nModes, freq=freq, timeRange = learning_range)
@@ -45,7 +45,7 @@ nesterov=False
 validation_fraction = 0.2
 stopCondition="minValTrain"
 earlyTermIndex=50
-nHiddenUnits = 48
+nHiddenUnits = 16
 
 initWtsMethod="lecun_normal"   # lecun_uniform glorot_normal glorot_uniform he_normal lecun_normal he_uniform
 orthoWts=False

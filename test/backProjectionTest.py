@@ -2,8 +2,6 @@ from cliMLe.trainingData import *
 from cliMLe.learning import FitResult, LearningModel, ActivationTarget
 import matplotlib.pyplot as plt
 
-
-
 strong_monsoon = ActivationTarget( 3.0, "Strong Monsoon" )
 weak_monsoon = ActivationTarget( -3.0, "Weak Monsoon" )
 
